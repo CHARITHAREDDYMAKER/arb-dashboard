@@ -73,8 +73,10 @@ def render_calculator(view: View, day: pd.Series) -> None:
                 "▼ Reverse arb: stock holder sells spot, buys futures",
                 calc["reverse"],
                 f"Holding-period return = net benefit / spot = <b>{pct(summary['reverse_holding_pct'], signed=True)}</b> over {days} days.<br>"
-                f"Annualised = that x 365 / {days} = <b>{pct(summary['reverse_annualised_pct'], signed=True)}</b>{caution}, "
-                f"<b>{summary['reverse_excess_over_tbill']:+.2f} points</b> against the T-bill. Needs stock already held.",
+                f"Annualised = that x 365 / {days} = <b>{pct(summary['reverse_annualised_pct'], signed=True)}</b>{caution}. Needs stock already held.<br>"
+                f"Excluding avoided funding: <b>{pct(summary['reverse_ex_funding_annualised_pct'], signed=True)}</b> a year, "
+                f"<b>{summary['reverse_excess_over_tbill']:+.2f} points</b> against the T-bill. The interest saved is itself earned at about the "
+                "T-bill rate, so it is left out of this comparison to avoid counting it twice.",
             ),
             unsafe_allow_html=True,
         )
@@ -151,7 +153,7 @@ def picked_date(event) -> str | None:
 
 TABLE_COLUMNS = {
     "date": st.column_config.DateColumn("Date", format="DD MMM YYYY", pinned=True, width=95),
-    "contract_symbol": st.column_config.TextColumn("Contract", width=160),
+    "contract_symbol": st.column_config.TextColumn("Contract", width=150),
     "days_to_expiry": st.column_config.NumberColumn("Days to expiry", width=85),
     "spot": st.column_config.NumberColumn("Spot", format="%.2f", width=80),
     "futures": st.column_config.NumberColumn("Futures", format="%.2f", width=80),
@@ -165,10 +167,32 @@ TABLE_COLUMNS = {
 }
 
 
+# Returns come before prices, so the T-bill comparison is visible on a laptop screen without scrolling.
+COLUMN_ORDER = [
+    "date", "contract_symbol", "days_to_expiry", "net_rs", "holding_pct", "annualised_pct", "ex_funding_annualised_pct",
+    "excess_over_tbill", "spot", "futures", "basis_pct", "final_settlement", "convergence_error_pct",
+]  # fmt: skip
+
+
+def table_columns(side: str) -> dict:
+    """Columns for one side's table.
+
+    Reverse arb gets an extra column: its return excluding avoided funding, which
+    is what the T-bill column is measured from. For cash-and-carry the annualised
+    return is already before funding, so no extra column is needed.
+    """
+    columns = dict(TABLE_COLUMNS)
+    if side == SIGNAL_REVERSE:
+        columns["annualised_pct"] = st.column_config.NumberColumn("Annualised % (full)", format="%.2f", width=105)
+        columns["ex_funding_annualised_pct"] = st.column_config.NumberColumn("Annualised % excl. avoided funding", format="%.2f", width=120)
+        columns["excess_over_tbill"] = st.column_config.NumberColumn("Excl. funding vs T-bill, pts", format="%.2f", width=120)
+    return {key: columns[key] for key in COLUMN_ORDER if key in columns}
+
+
 def all_rankings(days: pd.DataFrame, side: str) -> pd.DataFrame:
     """The three top-10 lists for one side in one table, for the CSV download."""
     lists = [metrics.best_dates(days, side, ranking).assign(ranking=label) for ranking, label in RANKINGS.items()]
-    return pd.concat(lists, ignore_index=True)[["ranking", *TABLE_COLUMNS]]
+    return pd.concat(lists, ignore_index=True)[["ranking", *table_columns(side)]]
 
 
 def render_best_dates(view: View, days: pd.DataFrame, economics: pd.DataFrame) -> None:
@@ -180,7 +204,13 @@ def render_best_dates(view: View, days: pd.DataFrame, economics: pd.DataFrame) -
         if table.empty:
             st.info(f"No tradeable {label.lower()} day in this list for the selected date range.")
         else:
-            st.dataframe(table[list(TABLE_COLUMNS)], column_config=TABLE_COLUMNS, hide_index=True, height=(len(table) + 1) * 35 + 3)
+            columns = table_columns(side)
+            st.dataframe(table[list(columns)], column_config=columns, hide_index=True, height=(len(table) + 1) * 35 + 3)
+        if side == SIGNAL_REVERSE:
+            st.caption(
+                "Reverse-arb return includes the interest saved on the cash (avoided funding). That interest is earned at about the T-bill rate, "
+                "so comparing the full return with the T-bill would count it twice. The T-bill column therefore uses the return excluding avoided funding."
+            )
         if ranking == metrics.RANK_SHORT_DATED:
             st.caption(f"Under {SHORT_DATED_DAYS} days to expiry: the annualised column multiplies a small gain by a large factor. Read Net Rs/qtl and Holding % instead.")
         narrative = metrics.describe_best_dates(view.name, side, days, economics, view.details.get("arrival_months"))
@@ -194,7 +224,8 @@ def render_best_dates(view: View, days: pd.DataFrame, economics: pd.DataFrame) -
         )  # fmt: skip
     st.caption(
         "Net Rs/qtl is profit after every cost including funding. Holding % and Annualised % are before funding for cash-and-carry, so they can be "
-        "compared with the T-bill. 'Settled at' and 'Settled vs 3-day spot' show how the contract actually ended, once it has expired."
+        "compared with the T-bill. 'Settled at' and 'Settled vs 3-day spot' show how the contract actually ended, once it has expired. "
+        "Arrival-season months in the text above are the typical arrival season (general market knowledge, not from exchange data)."
     )
 
 

@@ -77,6 +77,7 @@ The 3-day settlement rule (expiry day plus the two trading days before) is **inf
 | Tradeable signal | A raw signal that also makes money after every cost, including the one-off assaying and handling. This is the signal the dashboard shows. |
 | Holding-period return | Profit divided by spot, over the days the trade is held. Not annualised. |
 | Annualised return | Holding-period return x 365 / days to expiry. |
+| Return excluding avoided funding | Reverse-arb return with the interest saved left out. This is the reverse-arb figure compared with the T-bill, because the interest saved is itself earned at about the T-bill rate. |
 | Short-dated | Fewer than 15 days to expiry. Annualising exaggerates these, so the dashboard leads with rupees instead. |
 | Break-even storage | The warehouse rent at which cash-and-carry would make exactly zero. |
 | Calendar spread | Next-month futures minus near-month futures. |
@@ -191,7 +192,8 @@ One line per tab, to guide a first-time viewer.
 - **Inputs:** spot, active futures, days to expiry and T-bill on that date; storage and assaying rates; every desk input.
 - **How calculated:**
   - Cash-and-carry: gross = futures - spot. Subtract storage (rate x days), assaying, handling, exchange fee, SEBI fee, brokerage, GST on fees. That gives carry profit before funding. Holding-period return = carry profit / spot. Annualised = that x 365 / days. Then subtract funding (spot x (T-bill + spread) x days / 365) to get net profit.
-  - Reverse arb: price gap = spot - futures. Add the funding and storage avoided. Subtract exchange fee, SEBI fee, brokerage, GST on fees and stamp duty. That gives net benefit.
+  - Reverse arb: price gap = spot - futures. Add the funding and storage avoided. Subtract exchange fee, SEBI fee, brokerage, GST on fees and stamp duty. That gives net benefit. Holding-period and annualised return are worked out the same way.
+  - Reverse arb against the T-bill: the calculator also shows the return **excluding avoided funding** and compares that with the T-bill. The avoided funding is interest on the cash, earned at T-bill plus the spread. Comparing the full return with the T-bill would count that interest twice.
 - **What you can infer:** exactly where the money goes on any day. On 9 Oct 2026 jeera's Rs 204.00 basis leaves Rs 122.11 before funding and Rs 77.75 after.
 - **Caveats:** closing prices; a real entry would be at intraday prices. Funding is kept out of the return (but inside net profit) so the T-bill comparison does not count interest twice.
 - **Likely question:** "Why is stamp duty zero on cash-and-carry?" Stamp duty is charged to the buyer of a future. In cash-and-carry the futures are sold and then delivered against, so there is no purchase.
@@ -209,19 +211,19 @@ One line per tab, to guide a first-time viewer.
 
 - **What it shows:** for each side, the top 10 tradeable dates, with three rankings: best annualised return (15+ days to expiry, the main list), most Rs per quintal (any days to expiry), and short-dated (under 15 days, labelled as exaggerated).
 - **Inputs:** every tradeable day; expiry settlements for the last two columns.
-- **How calculated:** Net Rs/qtl is profit after every cost including funding. Holding % and Annualised % are before funding for cash-and-carry. "Over T-bill" is annualised minus the T-bill. "Settled at" and "Settled vs 3-day spot" show how the contract actually ended.
-- **What you can infer (jeera):** best cash-and-carry was 28 Nov 2025: 81.16% annualised, Rs 909.54 per quintal, 21 days to expiry. Best reverse arb was 4 Jun 2026: 83.68% annualised, Rs 671.11 per quintal, 15 days.
-- **Caveats:** these are the ten best days of a year, not a typical day. The median tradeable day earned about 16% (cash-and-carry) and 26% (reverse) annualised.
+- **How calculated:** Net Rs/qtl is profit after every cost including funding. Holding % and Annualised % are before funding for cash-and-carry, and "Over T-bill" is annualised minus the T-bill. The reverse-arb table has two extra columns in its place: "Annualised % excl. avoided funding" and "Ex-funding vs T-bill". "Settled at" and "Settled vs 3-day spot" show how the contract actually ended.
+- **What you can infer (jeera):** best cash-and-carry was 28 Nov 2025: 81.16% annualised, Rs 909.54 per quintal, 21 days to expiry, 75.82 points over the T-bill. Best reverse arb was 4 Jun 2026: 83.68% annualised, Rs 671.11 per quintal, 15 days; excluding avoided funding it was 77.20%, which is 71.72 points over the T-bill.
+- **Caveats:** these are the ten best days of a year, not a typical day. The median tradeable day earned about 16% (cash-and-carry) and 26% (reverse, or 19% excluding avoided funding) annualised.
 - **Likely question:** "Could you really have traded the best date?" In small size. Capacity on those days was a few crore, and the price is a daily close.
 
 #### Narrative line
 
 - **What it shows:** one generated paragraph per side: when returns peaked, what the top days had in common, and how often windows opened.
-- **Inputs:** the top 10 list, the 5-day spot move before each date, days to expiry, and the crop's arrival months.
+- **Inputs:** the top 10 list, the 5-day spot move before each date, days to expiry, and the crop's typical arrival season (general market knowledge, not from exchange data).
 - **How calculated:** counts the month with most top-10 days; compares their median days to expiry with all tradeable days; takes the median 5-day spot move; counts runs of consecutive tradeable days.
 - **Reading:** "Jeera cash-and-carry peaked on 28 Nov 2025 at 81.2% annualised. 3 of the top 10 fell in Nov 2025... tradeable on 106 days (43%), in 34 separate windows averaging 3.1 days each."
-- **Caveats:** it describes what happened alongside the peaks; it does not prove cause. Arrival months are general market knowledge, not from a cited source.
-- **Likely question:** "What drove the best cash-and-carry days?" Futures ran ahead of spot in a rising market in late 2025, about three to four weeks before expiry.
+- **Caveats:** it reports what was true on the best days; it does not claim a cause. The count of days in the arrival season uses the typical arrival season (general market knowledge, not from exchange data).
+- **Likely question:** "What drove the best cash-and-carry days?" The data shows what they had in common, not why: they came in late 2025, about three to four weeks before expiry, after spot had risen and futures had risen more. I would not claim a cause from one year.
 
 #### Downloads
 
@@ -268,11 +270,11 @@ Average, lowest, highest, latest against average, and the share of days futures 
 
 #### Reverse-arb return †
 
-- **What it shows:** the same chart for a stock holder selling spot and buying futures.
-- **Inputs:** `rev_return_pct`, `tradeable_signal`.
-- **How calculated:** (spot - futures + avoided funding + avoided storage - transaction costs) / spot x 365 / days.
-- **What you can infer:** jeera reverse arb was tradeable on 108 days with a median gain of 25.76% a year. Guar seed: 157 days.
-- **Caveats:** only available to someone holding stock. The gain includes costs avoided, not just cash received.
+- **What it shows:** the same chart for a stock holder selling spot and buying futures. Because it sits beside the T-bill line, the line drawn is the return **excluding avoided funding**.
+- **Inputs:** `rev_return_ex_funding_pct`, `rev_return_pct`, `tradeable_signal`.
+- **How calculated:** full return = (spot - futures + avoided funding + avoided storage - transaction costs) / spot x 365 / days. The line drawn leaves out the avoided funding.
+- **What you can infer:** jeera reverse arb was tradeable on 108 days. The median gain was 25.76% a year including interest saved and 19.39% excluding it. Guar seed: 157 days, 20.52% and 14.08%.
+- **Caveats:** only available to someone holding stock. The interest saved is earned at about the T-bill rate, so it is left out of the T-bill comparison to avoid counting it twice.
 - **Likely question:** "Why give reverse arb equal space?" In guar seed it is the dominant state of the market: 64% of days.
 
 #### Cost waterfall †
@@ -342,9 +344,9 @@ Days each side was tradeable, its share of days, the median annualised return an
 - **What it shows:** the average slope by calendar month.
 - **Inputs:** the daily slope.
 - **How calculated:** mean of the daily slope within each month.
-- **What you can infer:** jeera's curve was steepest in September 2026 (2.21% a month) and flattest in March 2026 (0.09%), when the new crop arrives.
-- **Caveats:** one year is one crop cycle. This is a pattern to test, not a rule.
-- **Likely question:** "Is that seasonality?" It is consistent with harvest arrivals flattening the curve, but one cycle cannot prove it.
+- **What you can infer:** jeera's curve was steepest in September 2026 (2.21% a month) and flattest in March 2026 (0.09%). March falls in jeera's typical arrival season (general market knowledge, not from exchange data).
+- **Caveats:** one year is one crop cycle. The chart shows when the slope changed, not why.
+- **Likely question:** "Is that seasonality?" It may be. The flattest month falls in the typical arrival season, but that is an observation from one cycle, and the arrival months are general market knowledge, not exchange data. I would need several years to call it seasonal.
 
 ### 5.6 Convergence & Entry Timing
 
@@ -481,6 +483,7 @@ Contract JEERAUNJHA19JUN2026, 15 days to expiry. Spot 19,515.65. Futures 18,905.
 
 - Holding-period return = 671.11 / 19,515.65 = **3.44%** over 15 days.
 - Annualised = 3.44% x 365 / 15 = **83.68%**.
+- Against the T-bill: leave out the avoided funding. (671.11 - 51.97) / 19,515.65 = 3.17% over 15 days, or **77.20%** a year, which is **71.72 points** above the 5.48% T-bill. The Rs 51.97 is interest on the cash, earned at about the T-bill rate, so including it and then subtracting the T-bill would count it twice.
 - Cash-and-carry on the same day would have lost Rs 747.54 per quintal.
 - What it needs: the trader must already own the jeera. They sell it, hold cash for 15 days, and take the same quantity back through the futures contract.
 

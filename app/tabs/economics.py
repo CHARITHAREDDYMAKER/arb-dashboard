@@ -119,11 +119,11 @@ def render(view: View) -> None:
         )
     with right:
         components.chart(
-            return_figure(economics, "rev_return_pct", SIGNAL_REVERSE, theme.REVERSE, "Reverse-arb return"),
+            return_figure(economics, "rev_return_ex_funding_pct", SIGNAL_REVERSE, theme.REVERSE, "Reverse-arb return, excl. avoided funding"),
             f"Reverse arb: what does a stock holder gain by selling spot and buying futures? {DAGGER}",
-            f"Tradeable on {reverse_days.sum()} of {len(economics)} days (shaded), median gain "
-            f"{pct(economics.loc[reverse_days, 'rev_return_pct'].median())} a year. It needs existing stock: physical goods cannot be shorted, "
-            f"which is why the gap persists. {clip_note}",
+            f"Tradeable on {reverse_days.sum()} of {len(economics)} days (shaded). Median gain {pct(economics.loc[reverse_days, 'rev_return_pct'].median())} a year "
+            f"including interest saved; {pct(economics.loc[reverse_days, 'rev_return_ex_funding_pct'].median())} excluding it, which is the line drawn here, "
+            f"because the interest saved is itself earned at about the T-bill rate. Needs existing stock. {clip_note}",
             key="reverse_return",
         )
 

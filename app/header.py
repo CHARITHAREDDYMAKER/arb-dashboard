@@ -61,10 +61,12 @@ def trade_card(view: View, recent) -> dict:
             f"<span class='greyed'>{pct(annual, signed=True)} annualised · {components.SHORT_DATED_NOTE}</span>",
             spark=spark,
         )
+    # Beside the T-bill, reverse arb shows its return excluding avoided funding (see metrics.reverse_arb).
+    against_tbill = f"{pct(snap['rev_return_ex_funding_pct'], signed=True)} excl. avoided funding vs {tbill}" if reverse else tbill
     return dict(
         label=f"{label} return {DAGGER}",
         value=f"{pct(annual, signed=True)} <span class='unit'>a year</span>",
-        sub=f"{tbill} · net {rs(profit, signed=True)} per quintal over {days} days",
+        sub=f"{against_tbill} · net {rs(profit, signed=True)} per quintal over {days} days",
         spark=spark,
     )
 

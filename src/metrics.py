@@ -205,15 +205,26 @@ def reverse_arb(spot, futures_price, days, tbill_pct, costs: CostInputs) -> dict
     """
     leg = futures_leg_costs(futures_price, costs, buys_futures=True)
     transaction = sum(leg.values())
-    avoided_carry = funding_cost(spot, tbill_pct, days, costs) + storage_cost(days, costs)
+    avoided_funding = funding_cost(spot, tbill_pct, days, costs)
+    avoided_carry = avoided_funding + storage_cost(days, costs)
     benefit = spot - futures_price + avoided_carry - transaction
+    # The benefit includes interest saved on the cash (avoided funding), which is itself
+    # earned at T-bill + spread. Comparing the full return with the T-bill would count that
+    # interest twice, so the T-bill comparison uses the return EXCLUDING avoided funding.
+    # This mirrors cash-and-carry, whose return is quoted before funding.
+    benefit_ex_funding = benefit - avoided_funding
+    return_ex_funding = annualise(benefit_ex_funding / spot * 100, days)
     return {
         "rev_price_gap": spot - futures_price,
+        "rev_avoided_funding": avoided_funding,
         "rev_avoided_carry": avoided_carry,
         "rev_transaction": transaction,
         "rev_benefit": benefit,
         "rev_benefit_pct": benefit / spot * 100,
         "rev_return_pct": annualise(benefit / spot * 100, days),
+        "rev_benefit_ex_funding": benefit_ex_funding,
+        "rev_return_ex_funding_pct": return_ex_funding,
+        "rev_excess_over_tbill": return_ex_funding - tbill_pct,
     }
 
 
@@ -466,7 +477,7 @@ def term_structure_daily(curve: pd.DataFrame) -> pd.DataFrame:
 
 
 def term_structure_monthly(daily: pd.DataFrame) -> pd.DataFrame:
-    """Calendar-month averages of the curve slope, to show the harvest-cycle pattern."""
+    """Calendar-month averages of the curve slope, to show how it changes through the year."""
     with_slope = daily.dropna(subset=["slope_pct_per_month"]).copy()
     with_slope["month"] = with_slope["date"].dt.to_period("M").dt.to_timestamp()
     return (
@@ -610,7 +621,8 @@ def trade_calculator(spot, futures_price, days, tbill_pct, costs: CostInputs) ->
             "reverse_benefit": reverse["rev_benefit"],
             "reverse_holding_pct": reverse["rev_benefit_pct"],
             "reverse_annualised_pct": reverse["rev_return_pct"],
-            "reverse_excess_over_tbill": reverse["rev_return_pct"] - tbill_pct,
+            "reverse_ex_funding_annualised_pct": reverse["rev_return_ex_funding_pct"],
+            "reverse_excess_over_tbill": reverse["rev_excess_over_tbill"],  # ex-funding return minus T-bill
             "fair_value": fair,
             "mispricing_pct": (futures_price - fair) / spot * 100,
         },
@@ -622,7 +634,12 @@ def signal_days(economics: pd.DataFrame, settlements: pd.DataFrame) -> pd.DataFr
 
     net_rs          profit after ALL costs including funding (what makes a day tradeable)
     holding_pct     return over the holding period; for cash-and-carry this is before funding
-    annualised_pct  holding_pct x 365 / days to expiry, the figure compared with the T-bill
+    annualised_pct  holding_pct x 365 / days to expiry
+    ex_funding_annualised_pct  the annualised return with interest left out, the figure
+                    compared with the T-bill. For cash-and-carry that is annualised_pct
+                    itself (already before funding); for reverse arb it excludes the
+                    avoided funding, which would otherwise be counted twice.
+    excess_over_tbill  ex_funding_annualised_pct minus the T-bill yield
     The last two columns show how the contract actually ended, once it has expired.
     """
     days = economics.loc[economics["tradeable_signal"] != SIGNAL_NONE].copy()
@@ -631,12 +648,13 @@ def signal_days(economics: pd.DataFrame, settlements: pd.DataFrame) -> pd.DataFr
     days["net_rs"] = np.where(is_carry, days["cc_net_profit"], days["rev_benefit"])
     days["holding_pct"] = np.where(is_carry, days["cc_holding_return_pct"], days["rev_benefit_pct"])
     days["annualised_pct"] = np.where(is_carry, days["cc_carry_return_pct"], days["rev_return_pct"])
-    days["excess_over_tbill"] = days["annualised_pct"] - days["tbill_pct"]
+    days["ex_funding_annualised_pct"] = np.where(is_carry, days["cc_carry_return_pct"], days["rev_return_ex_funding_pct"])
+    days["excess_over_tbill"] = days["ex_funding_annualised_pct"] - days["tbill_pct"]
     days["short_dated"] = days["days_to_expiry"] < SHORT_DATED_DAYS
     days = days.merge(settlements[["contract_symbol", "final_settlement", "convergence_error_pct"]], on="contract_symbol", how="left")
     columns = [
         "date", "commodity", "side", "contract_symbol", "days_to_expiry", "spot", "settlement_price", "basis_pct",
-        "net_rs", "holding_pct", "annualised_pct", "excess_over_tbill", "tbill_pct", "short_dated",
+        "net_rs", "holding_pct", "annualised_pct", "ex_funding_annualised_pct", "excess_over_tbill", "tbill_pct", "short_dated",
         "final_settlement", "convergence_error_pct",
     ]  # fmt: skip
     return days[columns].rename(columns={"settlement_price": "futures"}).reset_index(drop=True)
@@ -662,9 +680,11 @@ def best_dates(days: pd.DataFrame, side: str, ranking: str = RANK_BY_ANNUALISED,
 def describe_best_dates(name: str, side: str, days: pd.DataFrame, economics: pd.DataFrame, arrival_months: list[int] | None = None) -> str:
     """One paragraph: when this side's returns peaked, what those days had in common, and how often they came.
 
-    Three things are checked for the top 10 days (15+ days to expiry): how far
+    Three things are reported for the top 10 days (15+ days to expiry): how far
     from expiry they were, what spot had done over the previous five trading
-    days, and whether they fell in the crop's arrival season.
+    days, and how many fell in the crop's typical arrival season. These are
+    things that were true on those days, not causes. The arrival months are
+    general market knowledge held in the config, not exchange data.
     """
     label = "cash-and-carry" if side == SIGNAL_CASH_AND_CARRY else "reverse arb"
     top = best_dates(days, side, RANK_BY_ANNUALISED)
@@ -691,7 +711,7 @@ def describe_best_dates(name: str, side: str, days: pd.DataFrame, economics: pd.
     season_text = ""
     if arrival_months:
         in_season = int(top["date"].dt.month.isin(arrival_months).sum())
-        season_text = f" {in_season} of the {len(top)} fell in the arrival season."
+        season_text = f" {in_season} of the {len(top)} fell in the typical arrival season (general market knowledge, not from exchange data)."
 
     # How often: runs of consecutive trading days on which this side was tradeable.
     tradeable = (economics["tradeable_signal"] == side).reset_index(drop=True)
@@ -795,6 +815,8 @@ def snapshot(name: str, economics: pd.DataFrame, liquidity_table: pd.DataFrame) 
         "tbill_is_rbi_fill": latest["tbill_is_rbi_fill"],
         "cc_excess_over_tbill": latest["cc_excess_over_tbill"],
         "rev_return_pct": latest["rev_return_pct"],
+        "rev_return_ex_funding_pct": latest["rev_return_ex_funding_pct"],
+        "rev_excess_over_tbill": latest["rev_excess_over_tbill"],
         "break_even_storage": latest["break_even_storage"],
         "actual_storage": latest["actual_storage"],
         "capacity_rs_crore": liquidity_table.iloc[-1]["capacity_rs_crore"],

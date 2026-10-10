@@ -291,6 +291,39 @@ def test_calculator_reverse_lines_match_and_add_up():
     assert lines["= Net benefit"] == model["rev_benefit"]
     assert sum(amount for label, amount in lines.items() if not label.startswith("=")) == pytest.approx(model["rev_benefit"])
     assert calc["summary"]["reverse_annualised_pct"] == model["rev_return_pct"]
+    assert calc["summary"]["reverse_ex_funding_annualised_pct"] == model["rev_return_ex_funding_pct"]
+    assert calc["summary"]["reverse_excess_over_tbill"] == model["rev_excess_over_tbill"]
+
+
+def test_reverse_arb_is_compared_with_the_tbill_excluding_avoided_funding():
+    futures = 19_800.0
+    result = metrics.reverse_arb(SPOT, futures, DAYS, TBILL, COSTS)
+    # Benefit 496.2085 includes Rs 240 of avoided funding (20,000 x 6% x 73/365).
+    assert result["rev_avoided_funding"] == pytest.approx(240.0)
+    assert result["rev_benefit_ex_funding"] == pytest.approx(result["rev_benefit"] - 240.0)
+    # (benefit - 240) / 20,000 x 100, times 5 to annualise
+    assert result["rev_return_ex_funding_pct"] == pytest.approx((result["rev_benefit"] - 240.0) / SPOT * 100 * 5)
+    assert result["rev_excess_over_tbill"] == pytest.approx(result["rev_return_ex_funding_pct"] - TBILL)
+    # The gap between the two returns is exactly the funding rate (T-bill 5% + spread 1%).
+    assert result["rev_return_pct"] - result["rev_return_ex_funding_pct"] == pytest.approx(TBILL + COSTS.funding_spread_pct)
+
+
+def test_signal_days_measure_the_tbill_gap_from_the_ex_funding_return():
+    economics = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2026-01-05", "2026-01-06"]), "commodity": "JEERA",
+            "tradeable_signal": ["CASH_AND_CARRY", "REVERSE"], "contract_symbol": ["C1", "C1"], "days_to_expiry": [30, 29],
+            "spot": [20_000.0, 20_000.0], "settlement_price": [20_400.0, 19_800.0], "basis_pct": [2.0, -1.0], "tbill_pct": [5.0, 5.0],
+            "cc_net_profit": [100.0, -500.0], "rev_benefit": [-300.0, 250.0],
+            "cc_holding_return_pct": [1.0, -2.0], "rev_benefit_pct": [-1.5, 1.25],
+            "cc_carry_return_pct": [12.0, -24.0], "rev_return_pct": [-18.0, 15.0], "rev_return_ex_funding_pct": [-24.0, 9.0],
+        }
+    )  # fmt: skip
+    settlements = pd.DataFrame(columns=["contract_symbol", "final_settlement", "convergence_error_pct"])
+    days = metrics.signal_days(economics, settlements).set_index("side")
+    assert days.loc["CASH_AND_CARRY", "excess_over_tbill"] == pytest.approx(12.0 - 5.0)  # already before funding
+    assert days.loc["REVERSE", "ex_funding_annualised_pct"] == pytest.approx(9.0)
+    assert days.loc["REVERSE", "excess_over_tbill"] == pytest.approx(9.0 - 5.0)  # not 15 - 5
 
 
 def make_signal_days() -> pd.DataFrame:

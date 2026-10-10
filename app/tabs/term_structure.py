@@ -83,7 +83,7 @@ def render(view: View) -> None:
     steepest, flattest = (monthly.loc[monthly["avg_slope_pct_per_month"].agg(pick)] for pick in ("idxmax", "idxmin"))
     components.chart(
         monthly_figure(monthly),
-        "Does the slope follow the crop calendar?",
+        "How does the slope change through the year?",
         f"The curve was steepest in {steepest['month']:%B %Y} ({pct(steepest['avg_slope_pct_per_month'])} a month) and flattest in "
         f"{flattest['month']:%B %Y} ({pct(flattest['avg_slope_pct_per_month'])}). One year of data shows one cycle only, so read this as a pattern to test, not a rule.",
         key="monthly_slope", height=300,

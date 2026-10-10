@@ -5,7 +5,7 @@ lakh, funding at T-bill + 1%, handling Rs 10 per quintal, 18% GST on storage
 and assaying). If the data has been refreshed, read the header again before
 quoting today's numbers. Figures marked † depend on the handling or GST assumption.
 
-## Five numbers to remember
+## Numbers to remember
 
 1. **1.4% a month:** the average upward slope of both futures curves, roughly 17% a year, against a T-bill near 5.3%.
 2. **+2.0% to -0.5%:** jeera's average basis at 46 to 60 days out, and at 6 to 10 days out. The premium is gone before expiry.
@@ -13,33 +13,45 @@ quoting today's numbers. Figures marked † depend on the handling or GST assump
 4. **0.07%:** average gap between final settlement and the 3-day average spot, across 23 expired contracts.
 5. **Rs 2.9 crore and Rs 10.7 crore:** median daily capacity in jeera and guar seed at 10% of volume.
 
+Best dates (contracts with 15 or more days to expiry) †:
+
+| Side | Date | Days to expiry | Net Rs per quintal | Annualised | Against the T-bill |
+|---|---|---|---|---|---|
+| Jeera cash-and-carry | 28 Nov 2025 | 21 | 909.54 | 81.16% | +75.82 points |
+| Jeera reverse arb | 4 Jun 2026 | 15 | 671.11 | 83.68% (77.20% excluding avoided funding) | +71.72 points |
+| Guar seed cash-and-carry | 2 Sep 2026 | 16 | 170.64 | 65.21% | +59.96 points |
+| Guar seed reverse arb | 4 Mar 2026 | 16 | 108.20 | 46.33% (40.02% excluding avoided funding) | +34.71 points |
+
+The one to say out loud: **jeera, 28 Nov 2025: Rs 910 a quintal, 4.67% in 21 days.** Then add that the median tradeable day earned about 16% annualised, so the best day is the exception.
+
 ## Three-minute demo script
 
-Lead with the question, then the finding, then the evidence.
+Tab order in the app: Overview, Signal Finder, Cash vs Futures, Arb Economics, Term Structure, Convergence & Entry Timing, Rollover & Capacity, Method & Data. The demo uses five of them. Lead with the question, then the finding, then the evidence.
 
-**0:00 Overview tab (45 seconds)**
+**0:00 Overview (40 seconds)**
 - Say: "A cash-futures desk buys the commodity, stores it, sells futures and delivers. The question is whether the gap between futures and spot pays for the carry. I measured that for jeera and guar seed on NCDEX over a year, with real warehouse and exchange costs."
 - Point to the three cards: "Three things came out. The carry is earned early in a contract's life. Guar seed is mostly a reverse-arb market. And the model is tight, so the real limit is size."
 
-**0:45 Convergence & Entry Timing (50 seconds)**
+**0:40 Signal Finder (60 seconds)**
+- Question: "What does each trade actually earn, line by line?"
+- In the date box type **28 Nov 2025** (jeera). Say: "This was the best cash-and-carry day of the year. Futures were Rs 1,077 above spot with 21 days to run. Storage, assaying, handling and fees take Rs 90, funding takes Rs 77, and Rs 910 a quintal is left: 4.67% in 21 days."
+- Point to the timeline: "Each marker is a day. Teal is cash-and-carry, orange is reverse arb. They come in clusters, not single days."
+- Switch the commodity to **Guar seed** and pick **4 Mar 2026**. Say: "This is the mirror image, the best reverse-arb day. Futures were Rs 86 below spot. A stock holder sells spot, buys futures and gains Rs 108 a quintal with 16 days to run. It needs stock already held, which is why this gap persists."
+- Switch back to jeera.
+
+**1:40 Cash vs Futures (25 seconds)**
+- Question: "How far do futures usually sit from spot?"
+- Finding: "Jeera futures closed above spot on 61% of days. The basis ranged from -3.7% to +6.9% and averaged +0.45%. Today's is ordinary."
+
+**2:05 Convergence & Entry Timing (40 seconds)**
 - Question: "Does a contract keep its premium as delivery approaches?"
 - Finding: "No. Jeera futures average 2% over spot two months out and trade below spot in the last ten days."
-- Evidence: the bucket chart, then the entry-timing chart. "Assaying and handling are paid once, about Rs 69 a quintal for jeera †. Entered 46 to 60 days out the trade averaged +Rs 119 †; inside ten days it averaged -Rs 215 †."
+- Evidence: the bucket chart, then the entry-timing chart. "Assaying and handling are paid once, about Rs 69 a quintal †. Entered 46 to 60 days out the trade averaged +Rs 119 †; inside ten days it averaged -Rs 215 †."
 
-**1:35 Arb Economics (50 seconds)**
-- Question: "After every cost, how often is either side worth doing?"
-- Finding: "Jeera is two-sided: 43% cash-and-carry, 44% reverse †. Guar seed is 14% and 64% †."
-- Evidence: the two return charts with shaded tradeable days, then the waterfall. "On 9 October jeera's Rs 204 basis leaves Rs 78 after funding, storage, assaying, handling and fees †."
-- Switch the commodity to guar seed for five seconds to show the mirror image.
-
-**2:25 Rollover & Capacity (25 seconds)**
-- Question: "Can it be done in size?"
-- Finding: "About Rs 3 crore a day in jeera and Rs 11 crore in guar seed at 10% of volume. Positions leave the expiring contract before expiry week."
-
-**2:50 Method & Data (10 seconds)**
+**2:45 Method & Data (15 seconds)**
 - "Spot matched the exchange's page exactly on the day I checked. Contracts settled within 0.07% of where the model says. Two cost inputs are assumptions and they are marked."
 
-If asked to change something live: raise handling to Rs 25, or switch GST off, and show the header and tradeable-day counts move.
+If asked to change something live: raise handling to Rs 25, or switch GST off, and show the header and the tradeable-day counts move. If asked about size, open Rollover & Capacity: about Rs 3 crore a day in jeera and Rs 11 crore in guar seed.
 
 ## Likely questions
 
@@ -73,6 +85,18 @@ Run `python -m src.pipeline --update` after the bhavcopy is published each eveni
 **How would it extend to other commodities?**
 Add an entry in `config/commodities.toml` (symbol, lot size, basis centre) and the storage and assaying rates in `config/carry_costs.toml`. The bhavcopy already contains every NCDEX contract, so no new download is needed. Each new commodity needs its own checks: is the underlying price the delivery-centre spot, does it converge at expiry, and is it CTT-exempt.
 
+**Why is the best date 81% annualised when the median is about 16%?**
+Because it is the best of 106 tradeable days, and annualising stretches it. On 28 Nov 2025 the trade earned 4.67% in 21 days; multiplying by 365/21 gives 81%. That assumes the same gap could be found again seventeen times in a row, which it cannot. The tenth-best day earned about 36% and the median tradeable day about 16%, still roughly ten points over the T-bill. I would quote the median for what the strategy earns and the best day only as an example of the calculation.
+
+**Why rank only contracts with 15 or more days to expiry?**
+Annualising a short trade exaggerates it. Guar seed's best reverse day by rupees was 13 Jan 2026: Rs 233 a quintal with 7 days left, which annualises to 212%. A small gain multiplied by 52 is not a return anyone can compound. Short trades are also the ones where the one-off assaying and handling costs hurt most and where liquidity has already moved to the next contract. They are shown in a separate table, labelled as exaggerated, and the header leads with rupees for them.
+
+**How does the reverse-arb comparison with the T-bill work?**
+Reverse-arb benefit has three parts: the price gap, the storage saved, and the interest saved on the cash from selling the stock. That interest is itself earned at about the T-bill rate (T-bill plus the spread). Comparing the full return with the T-bill would count it twice. So the dashboard compares the return excluding avoided funding. On 4 Jun 2026 jeera reverse arb earned 83.68% annualised in full; excluding the Rs 52 of interest saved it was 77.20%, which is 71.72 points over a 5.48% T-bill. Across all tradeable reverse days the median is about 26% in full and 19% excluding avoided funding. This mirrors cash-and-carry, whose return is quoted before funding for the same reason.
+
+**What does the arrival season have to do with the best dates?**
+The dashboard counts how many of the top dates fell in each crop's typical arrival season. Those months are general market knowledge, not exchange data, and the count is an observation, not a cause. One year is one crop cycle.
+
 **Why did you not use same-day spot for convergence?**
 Because it understates how well contracts converge. Against same-day spot the average gap is 0.61%; against the 3-day average it is 0.07%.
 
@@ -90,6 +114,8 @@ Three checks. It matched the NCDEX spot page exactly on 9 Oct 2026 for both comm
 - **The 3-day settlement rule is inferred**, not read from the contract specification.
 - **Spot was cross-checked on one date only.**
 - **One year of data is one crop cycle.** The seasonality chart shows a pattern to test, not a rule.
+- **Arrival-season months are the typical arrival season (general market knowledge, not from exchange data).** They are reported next to the best dates as an observation, never as a cause.
+- **Best dates are the top of the distribution.** Quote the median (about 16% annualised for cash-and-carry) for what the strategy earns.
 - **Guar seed assaying** is charged per 10 MT sample lot. A single 5 MT lot pays the full charge, double the Rs 15 per quintal used here.
 - **The last five T-bill values are RBI auction yields**, used until FBIL publishes; they sit about 0.08 points above the FBIL series.
 - **Short-dated figures:** on 9 Oct both active contracts had 10 days or fewer to run, so the header leads with rupees per quintal. Do not quote the annualised figures for those days.
