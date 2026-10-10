@@ -29,6 +29,7 @@ SIGNAL_NONE = "NONE"
 CONVERGENCE_BUCKET_EDGES = [-1, 5, 10, 20, 30, 45, 60]
 CONVERGENCE_BUCKET_LABELS = ["0-5", "6-10", "11-20", "21-30", "31-45", "46-60"]
 ROLL_WINDOW_DAYS = 5  # trading days before expiry examined in the rollover table
+SHORT_DATED_DAYS = 15  # below this, annualising a return exaggerates it, so rupees and the holding-period return lead
 
 
 @dataclass(frozen=True)
@@ -554,6 +555,29 @@ def signal_shares(economics: pd.DataFrame, column: str = "tradeable_signal") -> 
     return {signal: float(shares.get(signal, 0.0)) for signal in (SIGNAL_CASH_AND_CARRY, SIGNAL_REVERSE, SIGNAL_NONE)}
 
 
+def describe_trade(day: pd.Series) -> str:
+    """What the tradeable side earns on one day, in words.
+
+    For a short-dated contract the rupee profit and the holding-period return
+    lead, and the annualised figure is given as a caution, not a headline.
+    """
+    signal, days = day["tradeable_signal"], day["days_to_expiry"]
+    if signal == SIGNAL_NONE:
+        return "neither side makes money after all costs"
+    if signal == SIGNAL_CASH_AND_CARRY:
+        action, profit, holding, annual = "cash-and-carry locks in", day["cc_net_profit"], day["cc_net_profit_pct"], day["cc_carry_return_pct"]
+        benchmark = f" against a T-bill yield of {day['tbill_pct']:.2f}%"
+    else:
+        action, profit, holding, annual = "a stock holder gains", day["rev_benefit"], day["rev_benefit_pct"], day["rev_return_pct"]
+        benchmark = " by selling spot and buying futures"
+    if days < SHORT_DATED_DAYS:
+        return (
+            f"{action} Rs {profit:,.0f} per quintal, {holding:.2f}% over {days} days{benchmark if signal == SIGNAL_REVERSE else ''} "
+            f"({annual:.0f}% annualised, which exaggerates so short a trade)"
+        )
+    return f"{action} {annual:.1f}% annualised{benchmark}"
+
+
 def build_insights(name: str, economics: pd.DataFrame, liquidity_table: pd.DataFrame) -> list[str]:
     """Three plain-English sentences for the dashboard header, generated from the data."""
     latest, shares = economics.iloc[-1], signal_shares(economics)
@@ -565,14 +589,9 @@ def build_insights(name: str, economics: pd.DataFrame, liquidity_table: pd.DataF
     )
 
     side = "above" if latest["mispricing"] >= 0 else "below"
-    today = {
-        SIGNAL_CASH_AND_CARRY: f"cash-and-carry locks in {latest['cc_carry_return_pct']:.1f}% annualised against a T-bill yield of {latest['tbill_pct']:.2f}%",
-        SIGNAL_REVERSE: f"a stock holder gains {latest['rev_return_pct']:.1f}% annualised by selling spot and buying futures",
-        SIGNAL_NONE: "neither side makes money after all costs",
-    }[latest["tradeable_signal"]]
     current = (
-        f"Today the active contract ({latest['days_to_expiry']} days to expiry) is Rs {abs(latest['mispricing']):,.0f} "
-        f"({abs(latest['mispricing_pct']):.2f}%) {side} fair value: {today}."
+        f"On {latest['date']:%d %b %Y} the active contract ({latest['days_to_expiry']} days to expiry) is "
+        f"Rs {abs(latest['mispricing']):,.0f} ({abs(latest['mispricing_pct']):.2f}%) {side} fair value: {describe_trade(latest)}."
     )
 
     if latest["break_even_storage"] > 0:
@@ -606,6 +625,9 @@ def snapshot(name: str, economics: pd.DataFrame, liquidity_table: pd.DataFrame) 
         "tradeable_signal": latest["tradeable_signal"],
         "rev_benefit": latest["rev_benefit"],
         "cc_net_profit": latest["cc_net_profit"],
+        "cc_net_profit_pct": latest["cc_net_profit_pct"],
+        "rev_benefit_pct": latest["rev_benefit_pct"],
+        "expiry": latest["expiry"],
         "cc_carry_return_pct": latest["cc_carry_return_pct"],
         "tbill_pct": latest["tbill_pct"],
         "tbill_is_rbi_fill": latest["tbill_is_rbi_fill"],

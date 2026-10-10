@@ -18,7 +18,7 @@ class Inputs:
     commodity: str
     start: date
     end: date
-    costs: CostInputs
+    costs: dict[str, CostInputs]  # one set of cost inputs per commodity; desk inputs apply to both
     rules: Rules
 
 
@@ -63,7 +63,7 @@ def render() -> Inputs:
             st.number_input(f"Handling {DAGGER} (Rs per quintal)", 0.0, 100.0, step=5.0, key="handling")
             st.toggle(f"18% GST on storage and assaying {DAGGER}", key="gst_on_storage")
             if settings.has_cold_storage(commodity):
-                st.toggle("Cold storage (Rs 8.5 per MT per day)", key="cold_storage")
+                st.toggle("Jeera in cold storage (Rs 8.5 per MT per day)", key="cold_storage")
             st.number_input("Signal threshold (% of spot)", 0.0, 5.0, step=0.05, key="signal_threshold")
             st.number_input("Roll when near month has fewer than (days)", 0, 20, step=1, key="roll_dte")
             st.button("Reset to defaults", on_click=reset_inputs, width="stretch")
@@ -77,13 +77,15 @@ def render() -> Inputs:
         )
 
     state = st.session_state
-    cold = state["cold_storage"] and settings.has_cold_storage(commodity)
-    costs = replace(
-        settings.load_cost_inputs(commodity, cold_storage=cold),
-        brokerage_rs_per_lakh=state["brokerage"],
-        funding_spread_pct=state["funding_spread"],
-        handling_rs_per_quintal=state["handling"],
-        gst_on_storage_and_assaying=state["gst_on_storage"],
-    )
+    costs = {
+        key: replace(
+            settings.load_cost_inputs(key, cold_storage=state["cold_storage"] and settings.has_cold_storage(key)),
+            brokerage_rs_per_lakh=state["brokerage"],
+            funding_spread_pct=state["funding_spread"],
+            handling_rs_per_quintal=state["handling"],
+            gst_on_storage_and_assaying=state["gst_on_storage"],
+        )
+        for key in COMMODITY_LABELS
+    }
     rules = replace(settings.load_rules(), signal_threshold_pct=state["signal_threshold"], roll_dte_threshold=state["roll_dte"])
     return Inputs(commodity, start, end, costs, rules)

@@ -5,7 +5,7 @@ import streamlit as st
 
 import components
 import theme
-from formatting import pct, rs, rs_crore
+from formatting import long_date, pct, rs, rs_crore
 from loader import View
 
 
@@ -88,21 +88,22 @@ def render(view: View) -> None:
         key="roll_pct", height=320,
     )  # fmt: skip
 
-    latest, lot = liquidity.iloc[-1], view.details["lot_size_mt"]
+    latest, lot = view.full["liquidity"].iloc[-1], view.details["lot_size_mt"]
+    as_of = long_date(latest["date"])
     share = view.rules.capacity_share_of_volume * 100
     components.chart(
         capacity_figure(liquidity),
         "How much size can actually be traded?",
-        f"At {share:.0f}% of {view.rules.capacity_window_days}-day average volume the active contract takes about {rs_crore(latest['capacity_rs_crore'])} a day now "
+        f"At {share:.0f}% of {view.rules.capacity_window_days}-day average volume the active contract took about {rs_crore(latest['capacity_rs_crore'])} a day on {as_of} "
         f"({latest['capacity_lots']:,.0f} lots of {lot} MT), against a median of {rs_crore(liquidity['capacity_rs_crore'].median())}. "
         "This, not the return, is what caps the strategy.",
         key="capacity", height=300,
     )  # fmt: skip
     components.kpi_row(
         [
-            dict(label="Volume today", value=f"{latest['volume_lots']:,.0f} lots", sub=rs_crore(latest["volume_rs_crore"])),
-            dict(label="Open interest today", value=f"{latest['open_interest_lots']:,.0f} lots", sub=rs_crore(latest["open_interest_rs_crore"])),
-            dict(label="Capacity today", value=rs_crore(latest["capacity_rs_crore"]), sub=f"{latest['capacity_lots']:,.0f} lots a day"),
+            dict(label=f"Volume, {as_of}", value=f"{latest['volume_lots']:,.0f} lots", sub=rs_crore(latest["volume_rs_crore"])),
+            dict(label="Open interest", value=f"{latest['open_interest_lots']:,.0f} lots", sub=rs_crore(latest["open_interest_rs_crore"])),
+            dict(label="Capacity", value=rs_crore(latest["capacity_rs_crore"]), sub=f"{latest['capacity_lots']:,.0f} lots a day"),
             dict(label="Capacity, median", value=rs_crore(liquidity["capacity_rs_crore"].median()), sub=f"lowest {rs_crore(liquidity['capacity_rs_crore'].min())}"),
         ]
     )

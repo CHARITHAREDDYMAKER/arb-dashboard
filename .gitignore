@@ -6,3 +6,7 @@ __pycache__/
 # Raw downloads are reproducible; processed parquet is committed for deployment.
 data/raw/*
 !data/raw/.gitkeep
+
+# Local tooling
+.pytest_cache/
+*.log

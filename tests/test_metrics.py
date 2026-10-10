@@ -218,3 +218,31 @@ def test_fixed_costs_hurt_short_trades_more():
     assert short["cc_net_profit"] == pytest.approx(long["cc_net_profit"], abs=0.5)
     # ...but per day of holding the short trade loses six times as fast.
     assert short["cc_net_profit"] / 10 < long["cc_net_profit"] / 60 < 0
+
+
+# ---- wording of short-dated trades ----------------------------------------- #
+
+
+def trade_day(days: int, signal: str) -> pd.Series:
+    return pd.Series(
+        {
+            "tradeable_signal": signal, "days_to_expiry": days, "tbill_pct": 5.5,
+            "cc_net_profit": 78.0, "cc_net_profit_pct": 0.32, "cc_carry_return_pct": 18.1,
+            "rev_benefit": 228.0, "rev_benefit_pct": 2.95, "rev_return_pct": 154.0,
+        }
+    )  # fmt: skip
+
+
+def test_short_dated_trade_leads_with_rupees_and_holding_period_return():
+    text = metrics.describe_trade(trade_day(10, "CASH_AND_CARRY"))
+    assert text.startswith("cash-and-carry locks in Rs 78 per quintal, 0.32% over 10 days")
+    assert "18% annualised, which exaggerates" in text
+
+
+def test_longer_dated_trade_leads_with_the_annualised_return():
+    text = metrics.describe_trade(trade_day(40, "REVERSE"))
+    assert text == "a stock holder gains 154.0% annualised by selling spot and buying futures"
+
+
+def test_no_tradeable_signal_says_so():
+    assert metrics.describe_trade(trade_day(10, "NONE")) == "neither side makes money after all costs"

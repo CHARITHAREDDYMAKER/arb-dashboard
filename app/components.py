@@ -32,6 +32,11 @@ CSS = f"""
 .flow-step {{ flex: 1; border: 1px solid {theme.FAINT}; border-radius: 8px; padding: 10px 12px; background: white; font-size: 0.86rem; }}
 .flow-step b {{ display: block; color: {theme.INK}; }}
 .flow-arrow {{ align-self: center; color: {theme.MUTED}; font-size: 1.2rem; }}
+.kpi-sub .greyed, .greyed {{ color: {theme.TBILL}; }}
+.unit {{ font-size: 0.8rem; font-weight: 400; color: {theme.MUTED}; }}
+.lede {{ font-size: 1.02rem; color: {theme.INK}; margin: 0.4rem 0 0.9rem 0; max-width: 1050px; }}
+.finding-title {{ font-size: 1.0rem; font-weight: 600; margin: 0; min-height: 3em; }}
+.finding-body {{ font-size: 0.87rem; color: {theme.SPOT}; margin: 0.25rem 0 0 0; min-height: 5.6em; }}
 .insight {{ font-size: 0.93rem; color: {theme.INK}; margin: 0.15rem 0; }}
 .legend-note {{ font-size: 0.8rem; color: {theme.MUTED}; }}
 </style>
@@ -52,8 +57,9 @@ def kpi(label: str, value: str, sub: str = "", greyed: bool = False) -> None:
     )
 
 
-def kpi_row(cards: list[dict]) -> None:
-    for column, card in zip(st.columns(len(cards)), cards):
+def kpi_row(cards: list[dict], widths: list[float] | None = None) -> None:
+    """A row of KPI cards; `widths` gives relative column widths (equal by default)."""
+    for column, card in zip(st.columns(widths or len(cards)), cards):
         with column:
             kpi(**card)
 

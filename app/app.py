@@ -16,9 +16,10 @@ import header
 import loader
 import sidebar
 import theme
-from tabs import cash_futures, convergence, economics, method, rollover, term_structure
+from tabs import cash_futures, convergence, economics, method, overview, rollover, term_structure
 
 TABS = {
+    "Overview": overview,
     "Cash vs Futures": cash_futures,
     "Arb Economics": economics,
     "Term Structure": term_structure,

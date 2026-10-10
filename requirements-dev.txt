@@ -1,0 +1,11 @@
+# Everything needed to refresh the data, run the tests and retake screenshots.
+-r requirements.txt
+
+# Data pipeline (python -m src.pipeline)
+requests==2.34.2
+pypdf==6.20.0          # reading the NCDEX fee circular in the feasibility check
+matplotlib==3.11.2     # sanity charts in the data-quality report
+
+# Tests and review tools
+pytest==9.1.1
+playwright==1.63.0     # tests/browser_check.py and tests/take_screenshots.py (uses installed Microsoft Edge)

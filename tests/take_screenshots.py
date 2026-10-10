@@ -17,7 +17,7 @@ from pathlib import Path
 from playwright.sync_api import Page, sync_playwright
 
 URL = "http://localhost:8765"
-OUT_DIR = Path(__file__).resolve().parents[1] / "reports" / "phase4_screens"
+OUT_DIR = Path(__file__).resolve().parents[1] / "reports" / "screens"
 COMMODITIES = ["JEERA", "GUARSEED"]
 WIDTH, HEIGHT = 1366, 768  # a common laptop screen
 
@@ -69,7 +69,7 @@ def main() -> int:
                 page.set_viewport_size({"width": WIDTH, "height": content_height(page) + 40})
                 page.wait_for_timeout(1200)
                 slug = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
-                path = OUT_DIR / f"{commodity.lower()}_{index + 1}_{slug}.png"
+                path = OUT_DIR / f"{commodity.lower()}_{index}_{slug}.png"
                 page.screenshot(path=str(path))
                 print(f"saved {path.name}")
         browser.close()
