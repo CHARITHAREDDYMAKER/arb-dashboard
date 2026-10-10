@@ -45,6 +45,9 @@ def render() -> Inputs:
     first_day, last_day = futures["date"].min().date(), futures["date"].max().date()
     for key, value in default_inputs().items():
         st.session_state.setdefault(key, value)
+        # Streamlit forgets a widget's value when the widget is not drawn (the cold-storage
+        # toggle is hidden for guar seed). Re-assigning the key keeps the value alive.
+        st.session_state[key] = st.session_state[key]
 
     with st.sidebar:
         st.markdown("### Arbitrage Monitor")

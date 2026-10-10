@@ -13,17 +13,21 @@ import re
 import sys
 
 from playwright.sync_api import Page, sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 URL = "http://localhost:8765"
 results: list[tuple[str, bool, str]] = []
 
 
 def settle(page: Page) -> None:
-    """Wait for Streamlit to finish re-running."""
+    """Wait for Streamlit to finish re-running and for the charts to render."""
     page.wait_for_selector('[role="tab"]', timeout=60_000)
-    page.wait_for_timeout(400)
-    page.wait_for_selector('[data-testid="stStatusWidget"]', state="detached", timeout=60_000)
-    page.wait_for_timeout(900)
+    try:  # give a re-run triggered by the last action a moment to start
+        page.wait_for_selector('[data-testid="stApp"][data-test-script-state="running"]', timeout=1500)
+    except PlaywrightTimeout:
+        pass  # nothing re-ran, or it finished before we looked
+    page.wait_for_selector('[data-testid="stApp"][data-test-script-state="notRunning"]', timeout=60_000)
+    page.wait_for_timeout(1200)
 
 
 def header_text(page: Page) -> str:
@@ -101,6 +105,13 @@ def main() -> int:
         state = expect_change(page, "GST on storage switched off", state)
         page.get_by_test_id("stSidebar").get_by_text("Jeera in cold storage").click()
         state = expect_change(page, "Cold storage switched on", state)
+        # The cold-storage setting must survive a visit to guar seed, where its toggle is hidden.
+        page.get_by_test_id("stRadioGroup").get_by_text("Guar seed").click()
+        settle(page)
+        page.get_by_test_id("stRadioGroup").get_by_text("Jeera", exact=True).click()
+        settle(page)
+        record("Cold storage stays on after switching commodity and back", header_text(page) == state and not has_error(page))
+
         set_number(page, "Signal threshold (% of spot)", "3")
         state = expect_change(page, "Signal threshold 0.25 -> 3", state)
         set_number(page, "Roll when near month has fewer than (days)", "12")

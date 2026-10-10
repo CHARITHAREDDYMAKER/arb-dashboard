@@ -62,7 +62,8 @@ def limit_figure(peers) -> go.Figure:
 
 def compact(figure: go.Figure) -> go.Figure:
     """Tighten a full-size chart so it reads inside a card."""
-    figure.update_traces(textfont=dict(size=11), cliponaxis=False)
+    figure.update_traces(textfont=dict(size=12, color=theme.INK), cliponaxis=False)
+    figure.update_layout(uniformtext=dict(minsize=12, mode="show"), bargap=0.15)  # stop Plotly shrinking the labels to fit
     figure.update_xaxes(tickangle=0, tickfont=dict(size=10))
     figure.update_yaxes(title="Basis, % of spot")
     return figure

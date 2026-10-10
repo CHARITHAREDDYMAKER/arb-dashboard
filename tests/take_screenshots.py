@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 from playwright.sync_api import Page, sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 URL = "http://localhost:8765"
 OUT_DIR = Path(__file__).resolve().parents[1] / "reports" / "screens"
@@ -23,10 +24,14 @@ WIDTH, HEIGHT = 1366, 768  # a common laptop screen
 
 
 def wait_until_drawn(page: Page) -> None:
-    """Wait for Streamlit to finish running and for the charts to render."""
+    """Wait for Streamlit to finish re-running and for the charts to render."""
     page.wait_for_selector('[role="tab"]', timeout=60_000)
-    page.wait_for_selector('[data-testid="stStatusWidget"]', state="detached", timeout=60_000)
-    page.wait_for_timeout(1500)
+    try:  # give a re-run triggered by the last action a moment to start
+        page.wait_for_selector('[data-testid="stApp"][data-test-script-state="running"]', timeout=1500)
+    except PlaywrightTimeout:
+        pass  # nothing re-ran, or it finished before we looked
+    page.wait_for_selector('[data-testid="stApp"][data-test-script-state="notRunning"]', timeout=60_000)
+    page.wait_for_timeout(1200)
 
 
 def content_height(page: Page) -> int:
