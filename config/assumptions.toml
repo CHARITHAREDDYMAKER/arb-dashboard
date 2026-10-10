@@ -1,0 +1,21 @@
+# Trader-specific inputs and model rules.
+# Every value here becomes a dashboard input in Phase 4. Published exchange and
+# warehouse charges are in config/carry_costs.toml.
+
+[costs]
+brokerage_rs_per_lakh        = 10.0    # on the futures leg; a prop desk pays less
+funding_spread_pct           = 1.0     # % p.a. over the 91-day T-bill yield
+gst_on_storage_and_assaying  = true    # 18% on warehouse charges; conservative default, treatment to_verify
+
+[costs.handling]
+status          = "placeholder"        # NOT sourced: loading/unloading is paid directly to the warehouse
+rs_per_quintal  = 10.0                 # round number covering load-in and load-out
+
+[rules]
+roll_dte_threshold     = 5      # active contract = near month, until it has fewer than this many calendar days left
+min_oi                 = 1      # MT; contracts below this are left out of term structure and rollover
+signal_threshold_pct   = 0.25   # mispricing vs fair value, % of spot, needed to raise a signal
+
+[capacity]
+share_of_volume   = 0.10    # tradeable size = this share of average daily volume
+window_days       = 20      # trading days in the volume average

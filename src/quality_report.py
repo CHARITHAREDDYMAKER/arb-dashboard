@@ -125,6 +125,11 @@ def spot_consistency_section(futures: pd.DataFrame, mismatches: pd.DataFrame) ->
             "",
             to_markdown(as_dates(mismatches, "trade_date")),
         ]
+    lines += [
+        "",
+        "Manual cross-check against the NCDEX spot price page for 9 Oct 2026: guar seed Jodhpur 7,706.70 (16:50) and "
+        "jeera Unjha 24,626.00 (15:19), both identical to the bhavcopy. `UndrlygPric` is the last polled spot of the day.",
+    ]
     return lines + [""]
 
 

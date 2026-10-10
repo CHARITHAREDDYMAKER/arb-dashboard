@@ -71,6 +71,8 @@ T-bill yield by source (range 5.15% to 5.57%):
 
 **Passed.** `UndrlygPric` is identical across all contracts of a commodity on all 492 date x commodity pairs.
 
+Manual cross-check against the NCDEX spot price page for 9 Oct 2026: guar seed Jodhpur 7,706.70 (16:50) and jeera Unjha 24,626.00 (15:19), both identical to the bhavcopy. `UndrlygPric` is the last polled spot of the day.
+
 ## 4. Expiry convergence
 
 For every contract that expired inside the window: its final settlement price against the spot price on expiry day, and against the average spot of the last three trading days (expiry day and the two before).

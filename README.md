@@ -38,10 +38,12 @@ Endpoints, sample rows and known gaps are in
 
 ```
 config/     commodities.toml, carry_costs.toml (fees and charges, with source links)
-src/        data pipeline and (later) the metrics engine
+src/        data pipeline and metrics engine
+tests/      unit tests
 app/        Streamlit dashboard (Phase 4)
 data/raw/   downloads as received (not committed)
-data/processed/   cleaned parquet files used by the dashboard
+data/processed/   cleaned parquet files used by the dashboard (metrics/ holds the derived tables)
+data/reference/   source documents for cost inputs
 reports/    phase reports
 ```
 
@@ -71,10 +73,42 @@ python -m src.pipeline --update     # later runs: fetch only new dates, rebuild 
 Prices are in Rs/quintal; volume and open interest in MT. Each run also rewrites
 [reports/phase2_data_quality.md](reports/phase2_data_quality.md).
 
+**Is the spot price right?** Spot is the bhavcopy's `UndrlygPric`, the last polled
+spot of the day at the basis centre. Two checks support it:
+
+- It matched the NCDEX spot price page exactly on 9 Oct 2026 (jeera Unjha 24,626.00,
+  guar seed Jodhpur 7,706.70), checked by hand.
+- Across 23 expired contracts the final settlement price equals the 3-day average
+  of this series to within 0.07% on average.
+
+## Metrics engine
+
+```powershell
+python -m src.build_metrics         # writes data/processed/metrics/*.parquet and reports/phase3_metrics.md
+python -m pytest                    # unit tests for the cost model, roll rule and signals
+```
+
+[src/metrics.py](src/metrics.py) holds pure functions: basis, cash-and-carry and
+reverse-arb economics, fair value and signals, convergence, term structure,
+rollover, liquidity and the header snapshot. The cost model is a function of a
+`CostInputs` object, so the dashboard can re-run a year of data with the user's
+own brokerage, funding spread, storage and handling numbers.
+
+| Config file | Holds |
+|---|---|
+| `config/carry_costs.toml` | Published charges with sources: exchange fee, SEBI fee, stamp duty, CTT, GST, NCCL storage and assaying |
+| `config/assumptions.toml` | Trader inputs and model rules: brokerage, funding spread, handling, roll rule, signal threshold, capacity |
+| `data/reference/` | The NCCL storage and assaying charges sheet (8 Oct 2026) |
+
+Two inputs are still assumptions: handling (Rs 10 per quintal, a placeholder) and
+whether 18% GST applies to warehouse charges (applied by default as the
+conservative case). Key numbers and findings are in
+[reports/phase3_metrics.md](reports/phase3_metrics.md).
+
 ## Status
 
 - [x] Phase 1: setup and data feasibility check
 - [x] Phase 2: data pipeline (12 months, both commodities)
-- [ ] Phase 3: metrics engine
+- [x] Phase 3: metrics engine
 - [ ] Phase 4: Streamlit dashboard
 - [ ] Phase 5: polish, insights, deployment

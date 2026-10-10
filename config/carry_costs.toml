@@ -3,10 +3,10 @@
 # Every item carries a `status`:
 #   confirmed  = value read from the linked source document during Phase 1
 #   to_verify  = value from general market knowledge, NOT yet checked against a source
-#   missing    = no value yet; the source could not be fetched automatically
+#   placeholder = working number that is NOT sourced; a dashboard input
 #
-# Nothing here is used in calculations until Phase 3. Items that are not
-# "confirmed" must be checked by hand before the numbers are presented.
+# Published charges live here. Trader-specific inputs (brokerage, funding spread,
+# handling) and model rules live in config/assumptions.toml.
 
 [exchange_transaction_fee]
 status      = "confirmed"
@@ -17,33 +17,62 @@ note        = "Flat rate for all futures contracts. Charged on the futures leg o
 source      = "NCDEX Master Circular - Trading Operations, NCDEX/TRADING-013/2026 (cites NCDEX/TRADING-042/2024), p.18"
 source_url  = "https://www.ncdex.com/public/uploads/circulars/Master%20Circular%20-%20Trading%20Operations_1777377096.pdf"
 
+# --- Warehouse charges -------------------------------------------------------
+# Source for storage and assaying: NCCL "Storage and Assaying Charges" sheet
+# dated 8 Oct 2026, saved as data/reference/storage-and-assaying-charges_8-Oct-2026.xlsx.
+# Notes printed on that sheet:
+#   * Storage charges INCLUDE insurance and fumigation.
+#   * Loading/unloading and other handling are NOT included; parties pay them directly.
+#   * Statutory levies (GST) are collected on top of these charges.
+#   * Charges are subject to a minimum holding period, and repository participants
+#     (and the repository, NERL) add their own charges, which are not modelled here.
+#   * If a deposit is smaller than the assaying sample lot, the full assaying charge
+#     still applies (guar seed: one 5 MT lot pays the 10 MT charge).
+
 [warehouse_storage.JEERA]
-status      = "missing"
-unit        = "Rs per MT per day (expected)"
-note        = "Published by NCCL as 'Indicative storage and assaying charges'. The page sits behind a browser check, so open it by hand and copy the Unjha rate."
-source_url  = "https://www.nccl.co.in/warehousing/warehouse-data"
+status           = "confirmed"
+value            = 7.0            # = Rs 0.70 per quintal per day
+cold_storage_value = 8.5          # alternative: cold storage
+unit             = "Rs per MT per day"
+location         = "Unjha (same rate at Jodhpur), all warehouses"
+source           = "NCCL Storage and Assaying Charges, 8 Oct 2026"
+source_file      = "data/reference/storage-and-assaying-charges_8-Oct-2026.xlsx"
 
 [warehouse_storage.GUARSEED]
-status      = "missing"
-unit        = "Rs per MT per day (expected)"
-note        = "Same NCCL document as jeera; copy the Jodhpur rate."
-source_url  = "https://www.nccl.co.in/warehousing/warehouse-data"
+status           = "confirmed"
+value            = 4.5            # = Rs 0.45 per quintal per day
+unit             = "Rs per MT per day"
+location         = "Jodhpur (same rate at Bikaner), all warehouses"
+source           = "NCCL Storage and Assaying Charges, 8 Oct 2026"
+source_file      = "data/reference/storage-and-assaying-charges_8-Oct-2026.xlsx"
 
-[assaying]
-status      = "missing"
-unit        = "Rs per sample / per lot"
-note        = "Same NCCL document. Paid by the depositor (the arbitrageur, as seller)."
-source_url  = "https://www.nccl.co.in/warehousing/warehouse-data"
+[assaying.JEERA]
+status           = "confirmed"
+value            = 1500.0         # = Rs 50 per quintal
+sample_lot_mt    = 3
+unit             = "Rs per sample lot"
+source           = "NCCL Storage and Assaying Charges, 8 Oct 2026"
+source_file      = "data/reference/storage-and-assaying-charges_8-Oct-2026.xlsx"
 
-[handling_and_delivery]
-status      = "missing"
-unit        = "Rs per MT"
-note        = "Loading/unloading, sampling, weighing at the warehouse, plus NCCL delivery charges. Seller bears all costs up to pay-in (NCCL Logistics Master Circular, section 10)."
-source_url  = "https://ncdex.com/public/uploads/circulars/Master%20Circular_Logistics_09.04.2025_1744112166.pdf"
+[assaying.GUARSEED]
+status           = "confirmed"
+value            = 1500.0         # = Rs 15 per quintal
+sample_lot_mt    = 10
+unit             = "Rs per sample lot"
+source           = "NCCL Storage and Assaying Charges, 8 Oct 2026"
+source_file      = "data/reference/storage-and-assaying-charges_8-Oct-2026.xlsx"
 
 [insurance]
-status      = "to_verify"
-note        = "Stock in NCCL-accredited warehouses is insured by the warehouse service provider; usually bundled into the storage charge. Confirm from the NCCL charges document."
+status           = "confirmed"
+value            = 0.0
+unit             = "included in storage"
+note             = "Warehouse storage costs include insurance and fumigation (note 4 on the NCCL sheet)."
+source_file      = "data/reference/storage-and-assaying-charges_8-Oct-2026.xlsx"
+
+[handling_and_delivery]
+status           = "placeholder"
+unit             = "Rs per quintal"
+note             = "Loading/unloading and handling are paid directly to the warehouse and are not published. The working value lives in config/assumptions.toml and is a dashboard input."
 
 [interest_on_funds]
 status      = "to_verify"
@@ -90,7 +119,9 @@ source_url  = "https://www.nseindia.com/static/invest/first-time-investor-sebi-t
 
 [gst_on_warehousing]
 status      = "to_verify"
-note        = "Entry 54(e) of Notification 12/2017-Central Tax (Rate) exempts storage or warehousing of 'agricultural produce'. Whether machine-cleaned jeera and guar seed count as agricultural produce under that definition is a legal reading we have not confirmed. If not exempt, storage charges carry 18% GST. Ask NCCL / the warehouse service provider how they invoice."
+value       = 18.0
+unit        = "% on storage and assaying charges"
+note        = "The NCCL sheet says statutory levies are collected on top of its charges. Entry 54(e) of Notification 12/2017-Central Tax (Rate) exempts storage of 'agricultural produce', and whether machine-cleaned jeera and guar seed qualify is not confirmed. The model applies 18% by default as the conservative case; the switch is gst_on_storage_and_assaying in config/assumptions.toml."
 source_url  = "https://cbic-gst.gov.in/"
 
 [gst_on_goods]

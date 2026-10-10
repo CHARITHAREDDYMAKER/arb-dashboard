@@ -1,6 +1,9 @@
 # Commodities covered by the monitor.
 # Symbols, lot sizes and basis centres were read from the NCDEX bhavcopy on
 # 2026-10-09 (see reports/phase1_data_check.md) and the contract specifications.
+# Spot = the bhavcopy's UndrlygPric, the last polled spot of the day at the basis
+# centre. Checked by hand against the NCDEX spot price page for 2026-10-09:
+# jeera Unjha 24,626.00 and guar seed Jodhpur 7,706.70, both exact matches.
 
 [JEERA]
 name            = "Jeera (cumin)"
