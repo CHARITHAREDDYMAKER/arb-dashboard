@@ -14,13 +14,31 @@ the basis (futures minus spot) less the cost of carrying the goods. It is worth
 doing when that net return, annualised, beats the 91-day T-bill yield. When
 futures trade below spot the trade runs in reverse.
 
-## What the dashboard will show
+## Run the dashboard
 
-1. **Cash vs Futures**: spot and near-month futures, basis in Rs and %, and its distribution.
-2. **Cash-and-Carry Return vs Risk-Free**: annualised gross and net-of-cost return against the 91-day T-bill.
-3. **Term Structure**: futures prices across expiries; contango vs backwardation through the harvest cycle.
-4. **Expiry Convergence**: basis % against days to expiry.
-5. **Rollover and Liquidity**: near/next spread and how open interest and volume move in expiry week.
+```powershell
+streamlit run app/app.py
+```
+
+The sidebar picks the commodity and date range and holds the desk inputs
+(brokerage, funding spread, handling, GST on storage, cold storage, signal
+threshold, roll rule). Changing an input re-runs the cost model on the whole year.
+
+| Tab | Question it answers |
+|---|---|
+| Cash vs Futures | How far do futures trade from spot, and is today's basis unusual? |
+| Arb Economics | Does cash-and-carry beat the T-bill, what does reverse arb pay, and where do the costs go? |
+| Term Structure | What does the curve look like, and is the market paying to carry stock forward? |
+| Convergence & Entry Timing | Does a contract keep its premium into delivery, and when should the trade be entered? |
+| Rollover & Capacity | What does the roll cost, and how much size can be traded? |
+| Method & Data | The trade, the data sources, the validation evidence and the cost model. |
+
+The header shows spot, the active contract, basis, the tradeable signal, carry
+return against the T-bill, break-even storage, and three sentences generated
+from the data. Figures marked with a dagger depend on an assumption.
+
+Screenshots of every tab are in [reports/phase4_screens/](reports/phase4_screens/).
+`python tests/take_screenshots.py` regenerates them from a running app.
 
 ## Data sources (all free)
 
@@ -40,7 +58,7 @@ Endpoints, sample rows and known gaps are in
 config/     commodities.toml, carry_costs.toml (fees and charges, with source links)
 src/        data pipeline and metrics engine
 tests/      unit tests
-app/        Streamlit dashboard (Phase 4)
+app/        Streamlit dashboard: app.py, sidebar, header, one module per tab in tabs/
 data/raw/   downloads as received (not committed)
 data/processed/   cleaned parquet files used by the dashboard (metrics/ holds the derived tables)
 data/reference/   source documents for cost inputs
@@ -110,5 +128,5 @@ conservative case). Key numbers and findings are in
 - [x] Phase 1: setup and data feasibility check
 - [x] Phase 2: data pipeline (12 months, both commodities)
 - [x] Phase 3: metrics engine
-- [ ] Phase 4: Streamlit dashboard
+- [x] Phase 4: Streamlit dashboard
 - [ ] Phase 5: polish, insights, deployment
