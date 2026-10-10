@@ -46,8 +46,13 @@ def monthly_figure(monthly) -> go.Figure:
 
 def render(view: View) -> None:
     curve, daily, monthly = (view.tables[name] for name in ("term_structure", "term_structure_daily", "term_structure_monthly"))
+    if not components.has_rows(curve, "The selected date range contains no trading days."):
+        return
     dates = sorted(curve["date"].unique())
-    chosen = st.select_slider("Curve date", options=dates, value=dates[-1], format_func=long_date, key="curve_date")
+    if len(dates) > 1:
+        chosen = st.select_slider("Curve date", options=dates, value=dates[-1], format_func=long_date, key="curve_date")
+    else:
+        chosen = dates[0]  # a slider needs at least two dates
     day_curve = curve.loc[curve["date"] == chosen].sort_values("expiry")
     day = daily.loc[daily["date"] == chosen].iloc[0]
 
@@ -64,6 +69,8 @@ def render(view: View) -> None:
     )
 
     with_slope = daily.dropna(subset=["slope_pct_per_month"])
+    if not components.has_rows(with_slope, "No day in the selected range has two contracts with open interest, so the curve has no slope."):
+        return
     contango = (with_slope["shape"] == "contango").mean() * 100
     components.chart(
         slope_figure(daily),

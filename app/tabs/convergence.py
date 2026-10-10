@@ -75,6 +75,8 @@ def error_figure(settlements) -> go.Figure:
 def render(view: View) -> None:
     buckets, paths = view.tables["convergence_buckets"], view.tables["convergence_paths"]
     timing, settlements = view.tables["entry_timing_buckets"], view.tables["expiry_settlements"]
+    if not components.has_rows(paths, "The selected date range has no contract within 60 days of expiry with open interest."):
+        return
     by_bucket = buckets.set_index("dte_bucket")["mean_basis_pct"]
 
     # On how many expiries did the basis average below zero in the last 10 days?
@@ -99,16 +101,24 @@ def render(view: View) -> None:
             key="paths",
         )
     with right:
-        short, long = timing.set_index("dte_bucket").reindex(["6-10", "46-60"]).to_dict("records")
-        components.chart(
-            timing_figure(timing),
-            f"When should a cash-and-carry be entered? {DAGGER}",
-            f"Entered 6 to 10 days out it averaged {rs(short['avg_net_profit'], 0, signed=True)} per quintal and paid on {short['profitable_pct']:.0f}% of days; "
-            f"at 46 to 60 days, {rs(long['avg_net_profit'], 0, signed=True)} and {long['profitable_pct']:.0f}%. One-off costs of about "
-            f"{rs(short['fixed_costs'], 0)} are paid whatever the holding period, so short trades start in a hole.",
-            key="entry_timing",
-        )
+        by_entry = timing.set_index("dte_bucket")
+        fixed_costs = rs(by_entry["fixed_costs"].mean(), 0)
+        if {"6-10", "46-60"} <= set(by_entry.index):
+            short, long = by_entry.loc["6-10"], by_entry.loc["46-60"]
+            timing_takeaway = (
+                f"Entered 6 to 10 days out it averaged {rs(short['avg_net_profit'], 0, signed=True)} per quintal and paid on {short['profitable_pct']:.0f}% of days; "
+                f"at 46 to 60 days, {rs(long['avg_net_profit'], 0, signed=True)} and {long['profitable_pct']:.0f}%. One-off costs of about "
+                f"{fixed_costs} are paid whatever the holding period, so short trades start in a hole."
+            )
+        else:
+            timing_takeaway = (
+                f"One-off costs of about {fixed_costs} are paid whatever the holding period, so short trades start in a hole. "
+                "The selected range does not cover both short and long entry windows; widen it to compare them."
+            )
+        components.chart(timing_figure(timing), f"When should a cash-and-carry be entered? {DAGGER}", timing_takeaway, key="entry_timing")
 
+    if not components.has_rows(settlements, "No contract expired inside the selected date range, so there is no settlement to check."):
+        return
     components.chart(
         error_figure(settlements),
         "Do contracts really settle at spot?",

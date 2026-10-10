@@ -64,6 +64,8 @@ def distribution_figure(view: View) -> go.Figure:
 
 def render(view: View) -> None:
     economics = view.tables["economics"]
+    if not components.has_rows(economics, "The selected date range contains no trading days."):
+        return
     basis_pct = economics["basis_pct"]
     current, average = view.latest["basis_pct"], basis_pct.mean()
     as_of = long_date(view.latest["date"])

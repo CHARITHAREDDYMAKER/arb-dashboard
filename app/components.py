@@ -77,6 +77,18 @@ def chart(figure: go.Figure, question: str, takeaway: str, key: str, height: int
     st.markdown(f'<p class="takeaway">{takeaway}</p>', unsafe_allow_html=True)
 
 
+def has_rows(table: pd.DataFrame, missing: str) -> bool:
+    """True if `table` has data. Otherwise show a note saying what the date range lacks.
+
+    A narrow date range can leave a chart with nothing to draw (for example a
+    week with no contract expiry). The tab explains that and carries on.
+    """
+    if table.empty:
+        st.info(f"{missing} Widen the date range in the sidebar to see this section.")
+        return False
+    return True
+
+
 def dagger_legend() -> None:
     st.markdown(
         f'<p class="legend-note">{DAGGER} depends on an assumption: handling cost (not published) or 18% GST on storage and '

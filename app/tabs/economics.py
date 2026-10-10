@@ -101,6 +101,8 @@ def gst_card(row: dict) -> dict:
 
 def render(view: View) -> None:
     economics, log = view.tables["economics"], view.tables["opportunities"]
+    if not components.has_rows(economics, "The selected date range contains no trading days."):
+        return
     latest, as_of = view.latest, long_date(view.latest["date"])
     carry_days = economics["tradeable_signal"] == SIGNAL_CASH_AND_CARRY
     reverse_days = economics["tradeable_signal"] == SIGNAL_REVERSE

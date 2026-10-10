@@ -56,8 +56,8 @@ def capacity_figure(liquidity) -> go.Figure:
     return figure
 
 
-def render(view: View) -> None:
-    roll, liquidity = view.tables["rollover"], view.tables["liquidity"]
+def render_roll(view: View, roll) -> None:
+    """The three roll charts. They need at least one expiry week in the date range."""
     spread, spread_ann = roll["calendar_spread"].mean(), roll["calendar_spread_ann_pct"].mean()
     expiries = roll["contract_symbol_near"].nunique()
 
@@ -87,6 +87,14 @@ def render(view: View) -> None:
         f"rising to {roll_by_day.iloc[-1]:.0f}% on expiry day. Liquidity has moved on before expiry week begins, which is why the active contract rolls early.",
         key="roll_pct", height=320,
     )  # fmt: skip
+
+
+def render(view: View) -> None:
+    roll, liquidity = view.tables["rollover"], view.tables["liquidity"]
+    if not components.has_rows(liquidity, "The selected date range contains no trading days."):
+        return
+    if components.has_rows(roll, "The selected date range contains no expiry week, so there is no roll to measure."):
+        render_roll(view, roll)
 
     latest, lot = view.full["liquidity"].iloc[-1], view.details["lot_size_mt"]
     as_of = long_date(latest["date"])
