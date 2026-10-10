@@ -28,12 +28,20 @@ def load_rules() -> Rules:
     )
 
 
-def load_cost_inputs(commodity: str) -> CostInputs:
-    """Default cost inputs for one commodity, converted to Rs per quintal."""
+def has_cold_storage(commodity: str) -> bool:
+    return "cold_storage_value" in read_config("carry_costs.toml")["warehouse_storage"][commodity]
+
+
+def load_cost_inputs(commodity: str, cold_storage: bool = False) -> CostInputs:
+    """Default cost inputs for one commodity, converted to Rs per quintal.
+
+    `cold_storage` swaps in the cold-storage rent where NCCL publishes one (jeera).
+    """
     published = read_config("carry_costs.toml")
     assumed = read_config("assumptions.toml")["costs"]
 
-    storage_per_mt_per_day = published["warehouse_storage"][commodity]["value"]
+    storage = published["warehouse_storage"][commodity]
+    storage_per_mt_per_day = storage["cold_storage_value"] if cold_storage else storage["value"]
     assaying = published["assaying"][commodity]
     return CostInputs(
         storage_rs_per_quintal_per_day=storage_per_mt_per_day / QUINTALS_PER_MT,

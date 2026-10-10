@@ -166,6 +166,8 @@ def cash_and_carry(spot, futures_price, days, tbill_pct, costs: CostInputs) -> d
     carry_return = annualise((gross - non_funding_costs) / spot * 100, days)
 
     paid_days = np.where(np.asarray(days) > 0, days, np.nan) * costs.warehouse_gst_multiplier
+    # GST shown on its own line in the cost waterfall: on fees, and on warehouse charges if switched on.
+    warehouse_gst = (storage + assaying) * (1 - 1 / costs.warehouse_gst_multiplier)
     return {
         "cc_gross": gross,
         "cc_funding": funding,
@@ -173,6 +175,8 @@ def cash_and_carry(spot, futures_price, days, tbill_pct, costs: CostInputs) -> d
         "cc_assaying": assaying,
         "cc_handling": handling,
         "cc_transaction": transaction,
+        "cc_fees_ex_gst": transaction - leg["gst_on_fees"],
+        "cc_gst": leg["gst_on_fees"] + warehouse_gst,
         "cc_total_costs": funding + non_funding_costs,
         "cc_net_profit": net_profit,
         "cc_net_profit_pct": net_profit / spot * 100,
@@ -231,6 +235,19 @@ def classify_signal(mispricing_pct, threshold_pct: float):
     )
 
 
+def classify_tradeable(signal, cash_and_carry_profit, reverse_benefit):
+    """Keep a signal only if the trade makes money after ALL costs.
+
+    The raw signal compares futures with fair value, which leaves out the one-off
+    assaying and handling costs. A cash-and-carry signal is TRADEABLE only if its
+    net profit is positive; a reverse signal only if its net benefit is positive.
+    """
+    signal = np.asarray(signal)
+    carry_pays = (signal == SIGNAL_CASH_AND_CARRY) & (np.asarray(cash_and_carry_profit, dtype=float) > 0)
+    reverse_pays = (signal == SIGNAL_REVERSE) & (np.asarray(reverse_benefit, dtype=float) > 0)
+    return np.where(carry_pays | reverse_pays, signal, SIGNAL_NONE)
+
+
 # --------------------------------------------------------------------------- #
 # 1. Basis table and the daily economics of the active contract
 # --------------------------------------------------------------------------- #
@@ -265,6 +282,7 @@ def daily_economics(basis: pd.DataFrame, tbill: pd.DataFrame, costs: CostInputs,
     active["mispricing"] = price - active["fair_value"]
     active["mispricing_pct"] = active["mispricing"] / spot * 100
     active["signal"] = classify_signal(active["mispricing_pct"], rules.signal_threshold_pct)
+    active["tradeable_signal"] = classify_tradeable(active["signal"], active["cc_net_profit"], active["rev_benefit"])
     active["tbill_is_rbi_fill"] = active["tbill_source"] == "rbi_fill"
     active["actual_storage"] = costs.storage_rs_per_quintal_per_day
     return active.sort_values("date").reset_index(drop=True)
@@ -289,8 +307,9 @@ def expiry_settlements(basis: pd.DataFrame) -> pd.DataFrame:
 
 
 def opportunity_log(economics: pd.DataFrame, settlements: pd.DataFrame) -> pd.DataFrame:
-    """Every day with a signal, with the return locked in by holding to expiry."""
-    log = economics.loc[economics["signal"] != SIGNAL_NONE].copy()
+    """Every day with a TRADEABLE signal, with the return locked in by holding to expiry."""
+    log = economics.loc[economics["tradeable_signal"] != SIGNAL_NONE].copy()
+    log["signal"] = log["tradeable_signal"]
     is_carry = log["signal"] == SIGNAL_CASH_AND_CARRY
     log["locked_profit"] = np.where(is_carry, log["cc_net_profit"], log["rev_benefit"])
     log["locked_return_ann_pct"] = np.where(is_carry, log["cc_carry_return_pct"], log["rev_return_pct"])
@@ -304,7 +323,7 @@ def opportunity_log(economics: pd.DataFrame, settlements: pd.DataFrame) -> pd.Da
 
 
 def opportunity_summary(economics: pd.DataFrame, log: pd.DataFrame) -> pd.DataFrame:
-    """Signal days and locked returns by side."""
+    """Tradeable signal days and locked returns by side."""
     total_days = len(economics)
     summary = (
         log.groupby(["commodity", "signal"])
@@ -314,7 +333,6 @@ def opportunity_summary(economics: pd.DataFrame, log: pd.DataFrame) -> pd.DataFr
             median_locked_return_ann_pct=("locked_return_ann_pct", "median"),
             best_locked_return_ann_pct=("locked_return_ann_pct", "max"),
             avg_locked_profit=("locked_profit", "mean"),
-            profitable_days=("locked_profit", lambda profit: int((profit > 0).sum())),
         )
         .reset_index()
     )
@@ -354,6 +372,49 @@ def convergence_buckets(paths: pd.DataFrame) -> pd.DataFrame:
     )
     buckets["dte_bucket"] = pd.Categorical(buckets["dte_bucket"], CONVERGENCE_BUCKET_LABELS, ordered=True)
     return buckets.sort_values(["commodity", "dte_bucket"]).astype({"dte_bucket": str}).reset_index(drop=True)
+
+
+def entry_timing(basis: pd.DataFrame, tbill: pd.DataFrame, costs: CostInputs, rules: Rules) -> pd.DataFrame:
+    """Cash-and-carry economics of entering ANY held contract (ONE commodity) on any day.
+
+    Unlike `daily_economics`, this is not limited to the active contract: it asks
+    what a trade entered N days before expiry would have locked in. Assaying and
+    handling are paid once whatever the holding period, so they weigh most on
+    short trades.
+    """
+    held = basis.loc[(basis["open_interest"] >= rules.min_oi) & basis["days_to_expiry"].between(1, 60)]
+    held = held.merge(tbill.rename(columns={"yield_pct": "tbill_pct"})[["date", "tbill_pct"]], on="date", how="left")
+    result = cash_and_carry(held["spot"], held["settlement_price"], held["days_to_expiry"], held["tbill_pct"], costs)
+    held = held.assign(
+        cc_gross=result["cc_gross"],
+        cc_net_profit=result["cc_net_profit"],
+        cc_fixed_costs=result["cc_assaying"] + result["cc_handling"],
+        cc_carry_return_pct=result["cc_carry_return_pct"],
+    )
+    held["dte_bucket"] = pd.cut(held["days_to_expiry"], CONVERGENCE_BUCKET_EDGES, labels=CONVERGENCE_BUCKET_LABELS).astype(str)
+    columns = [
+        "date", "commodity", "contract_symbol", "days_to_expiry", "dte_bucket",
+        "cc_gross", "cc_fixed_costs", "cc_net_profit", "cc_carry_return_pct",
+    ]  # fmt: skip
+    return held[columns]
+
+
+def entry_timing_buckets(timing: pd.DataFrame) -> pd.DataFrame:
+    """Average outcome of a cash-and-carry by how many days before expiry it was entered."""
+    buckets = (
+        timing.groupby("dte_bucket")
+        .agg(
+            observations=("cc_net_profit", "size"),
+            avg_gross=("cc_gross", "mean"),
+            avg_net_profit=("cc_net_profit", "mean"),
+            median_net_profit=("cc_net_profit", "median"),
+            profitable_pct=("cc_net_profit", lambda profit: (profit > 0).mean() * 100),
+            fixed_costs=("cc_fixed_costs", "mean"),
+        )
+        .reindex(CONVERGENCE_BUCKET_LABELS)
+        .dropna(subset=["observations"])
+    )
+    return buckets.rename_axis("dte_bucket").reset_index()
 
 
 # --------------------------------------------------------------------------- #
@@ -487,9 +548,9 @@ def liquidity(basis: pd.DataFrame, lot_size_mt: float, rules: Rules) -> pd.DataF
 # --------------------------------------------------------------------------- #
 
 
-def signal_shares(economics: pd.DataFrame) -> dict:
-    """Percentage of days spent in each signal state."""
-    shares = economics["signal"].value_counts(normalize=True) * 100
+def signal_shares(economics: pd.DataFrame, column: str = "tradeable_signal") -> dict:
+    """Percentage of days spent in each signal state (tradeable signal by default)."""
+    shares = economics[column].value_counts(normalize=True) * 100
     return {signal: float(shares.get(signal, 0.0)) for signal in (SIGNAL_CASH_AND_CARRY, SIGNAL_REVERSE, SIGNAL_NONE)}
 
 
@@ -498,37 +559,30 @@ def build_insights(name: str, economics: pd.DataFrame, liquidity_table: pd.DataF
     latest, shares = economics.iloc[-1], signal_shares(economics)
     capacity = liquidity_table.iloc[-1]
 
-    dominant = SIGNAL_REVERSE if shares[SIGNAL_REVERSE] >= shares[SIGNAL_CASH_AND_CARRY] else SIGNAL_CASH_AND_CARRY
-    territory = "reverse-arb territory (futures below fair value)" if dominant == SIGNAL_REVERSE else "cash-and-carry territory (futures above fair value)"
-    other = SIGNAL_CASH_AND_CARRY if dominant == SIGNAL_REVERSE else SIGNAL_REVERSE
     history = (
-        f"{name} has traded in {territory} on {shares[dominant]:.0f}% of days in the past year, "
-        f"against {shares[other]:.0f}% on the other side."
+        f"{name} offered a tradeable cash-and-carry on {shares[SIGNAL_CASH_AND_CARRY]:.0f}% of days and a tradeable "
+        f"reverse arb on {shares[SIGNAL_REVERSE]:.0f}% of days; on the remaining {shares[SIGNAL_NONE]:.0f}% neither side paid after costs."
     )
 
     side = "above" if latest["mispricing"] >= 0 else "below"
     today = {
         SIGNAL_CASH_AND_CARRY: f"cash-and-carry locks in {latest['cc_carry_return_pct']:.1f}% annualised against a T-bill yield of {latest['tbill_pct']:.2f}%",
         SIGNAL_REVERSE: f"a stock holder gains {latest['rev_return_pct']:.1f}% annualised by selling spot and buying futures",
-        SIGNAL_NONE: "neither side clears the signal threshold",
-    }[latest["signal"]]
+        SIGNAL_NONE: "neither side makes money after all costs",
+    }[latest["tradeable_signal"]]
     current = (
         f"Today the active contract ({latest['days_to_expiry']} days to expiry) is Rs {abs(latest['mispricing']):,.0f} "
         f"({abs(latest['mispricing_pct']):.2f}%) {side} fair value: {today}."
     )
 
-    covered = (economics["break_even_storage"] > economics["actual_storage"]).mean() * 100
     if latest["break_even_storage"] > 0:
         level = (
-            f"break-even storage is now Rs {latest['break_even_storage']:.2f} per quintal per day "
-            f"against an actual Rs {latest['actual_storage']:.2f}"
+            f"Break-even storage is Rs {latest['break_even_storage']:.2f} per quintal per day "
+            f"against an actual Rs {latest['actual_storage']:.2f}, so futures pay for the warehouse with room to spare"
         )
     else:
-        level = "today futures do not cover the other carry costs, so no storage rate would make cash-and-carry pay"
-    storage = (
-        f"Futures covered the full cost of carry on {covered:.0f}% of days; {level}. "
-        f"About Rs {capacity['capacity_rs_crore']:.1f} crore a day is tradeable."
-    )
+        level = "Futures do not cover the other carry costs today, so no storage rate would make cash-and-carry pay"
+    storage = f"{level}. About Rs {capacity['capacity_rs_crore']:.1f} crore a day is tradeable in the active contract."
     return [history, current, storage]
 
 
@@ -549,6 +603,8 @@ def snapshot(name: str, economics: pd.DataFrame, liquidity_table: pd.DataFrame) 
         "fair_value": latest["fair_value"],
         "mispricing_pct": latest["mispricing_pct"],
         "signal": latest["signal"],
+        "tradeable_signal": latest["tradeable_signal"],
+        "rev_benefit": latest["rev_benefit"],
         "cc_net_profit": latest["cc_net_profit"],
         "cc_carry_return_pct": latest["cc_carry_return_pct"],
         "tbill_pct": latest["tbill_pct"],

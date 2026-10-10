@@ -117,6 +117,37 @@ def test_signal_thresholds():
     assert list(signals) == ["CASH_AND_CARRY", "NONE", "NONE", "NONE", "REVERSE"]
 
 
+def test_tradeable_signal_needs_profit_after_all_costs():
+    signals = ["CASH_AND_CARRY", "CASH_AND_CARRY", "REVERSE", "REVERSE", "NONE"]
+    carry_profit = [25.0, -5.0, -400.0, -400.0, 30.0]
+    reverse_benefit = [-300.0, -300.0, 40.0, 0.0, 10.0]
+    tradeable = metrics.classify_tradeable(signals, carry_profit, reverse_benefit)
+    # Kept only when its own side makes money; a NONE signal is never upgraded.
+    assert list(tradeable) == ["CASH_AND_CARRY", "NONE", "REVERSE", "NONE", "NONE"]
+
+
+def test_small_mispricing_can_signal_but_not_be_tradeable():
+    # Futures Rs 60 (0.30%) above fair value over 10 days: a raw cash-and-carry signal,
+    # but the one-off assaying (59) and handling (10) cost more than the edge.
+    spot, days = 20_000.0, 10
+    futures = metrics.fair_value(spot, days, TBILL, COSTS) + 60.0
+    result = metrics.cash_and_carry(spot, futures, days, TBILL, COSTS)
+    signal = metrics.classify_signal([60.0 / spot * 100], threshold_pct=0.25)
+    assert list(signal) == ["CASH_AND_CARRY"]
+    assert result["cc_net_profit"] < 0
+    assert list(metrics.classify_tradeable(signal, [result["cc_net_profit"]], [0.0])) == ["NONE"]
+
+
+def test_waterfall_lines_add_up_to_net_profit():
+    result = metrics.cash_and_carry(SPOT, FUTURES, DAYS, TBILL, COSTS)
+    storage_ex_gst, assaying_ex_gst = 51.10, 50.0
+    lines = (
+        result["cc_funding"] + storage_ex_gst + assaying_ex_gst + result["cc_handling"]
+        + result["cc_fees_ex_gst"] + result["cc_gst"]
+    )  # fmt: skip
+    assert result["cc_gross"] - lines == pytest.approx(result["cc_net_profit"])
+
+
 # ---- roll rule ------------------------------------------------------------ #
 
 
@@ -174,3 +205,16 @@ def test_three_day_spot_average():
     assert np.isnan(averaged.iloc[1])  # not enough history yet
     assert averaged.iloc[2] == pytest.approx(110.0)
     assert averaged.iloc[3] == pytest.approx(380.0 / 3)
+
+
+# ---- entry timing --------------------------------------------------------- #
+
+
+def test_fixed_costs_hurt_short_trades_more():
+    # Same Rs 60 edge over fair value, entered 10 days and 60 days before expiry.
+    short = metrics.cash_and_carry(SPOT, metrics.fair_value(SPOT, 10, TBILL, COSTS) + 60, 10, TBILL, COSTS)
+    long = metrics.cash_and_carry(SPOT, metrics.fair_value(SPOT, 60, TBILL, COSTS) + 60, 60, TBILL, COSTS)
+    # Net profit is almost the same in rupees (both carry the Rs 69 one-off cost)...
+    assert short["cc_net_profit"] == pytest.approx(long["cc_net_profit"], abs=0.5)
+    # ...but per day of holding the short trade loses six times as fast.
+    assert short["cc_net_profit"] / 10 < long["cc_net_profit"] / 60 < 0

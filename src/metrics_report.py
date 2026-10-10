@@ -29,6 +29,7 @@ def key_numbers(commodity: str, tables: dict[str, pd.DataFrame]) -> pd.DataFrame
     economics, snap = own("economics"), own("snapshot").iloc[0]
     summary = own("opportunity_summary").set_index("signal")
     shares = metrics.signal_shares(economics)
+    raw_shares = metrics.signal_shares(economics, "signal")
     settlements, roll, liquidity = own("expiry_settlements"), own("rollover"), own("liquidity")
     curve = own("term_structure_daily")
     profitable = economics.loc[economics["cc_net_profit"] > 0]
@@ -43,7 +44,8 @@ def key_numbers(commodity: str, tables: dict[str, pd.DataFrame]) -> pd.DataFrame
         ("Active futures", f"{snap['active_futures']:,.2f}"),
         ("Basis", f"{snap['basis']:+,.2f} ({snap['basis_pct']:+.2f}%)"),
         (f"Fair value {ASSUMED}", f"{snap['fair_value']:,.2f}; futures {snap['mispricing_pct']:+.2f}% vs fair"),
-        (f"Signal {ASSUMED}", snap["signal"]),
+        (f"Raw signal (vs fair value) {ASSUMED}", snap["signal"]),
+        (f"Tradeable signal (profitable after all costs) {ASSUMED}", snap["tradeable_signal"]),
         (f"Cash-and-carry net profit {ASSUMED}", f"Rs {snap['cc_net_profit']:+,.2f} per quintal"),
         (f"Cash-and-carry return, annualised {ASSUMED}", f"{snap['cc_carry_return_pct']:+.1f}%"),
         ("91-day T-bill", f"{snap['tbill_pct']:.2f}%" + (" (RBI fill)" if snap["tbill_is_rbi_fill"] else "")),
@@ -52,15 +54,19 @@ def key_numbers(commodity: str, tables: dict[str, pd.DataFrame]) -> pd.DataFrame
         (f"Break-even storage now {ASSUMED}", f"Rs {snap['break_even_storage']:.2f} per quintal per day (actual {snap['actual_storage']:.2f})"),
         ("**Over the year**", f"{len(economics)} trading days"),
         (
-            f"Days per signal {ASSUMED}",
+            f"Days per raw signal {ASSUMED}",
+            f"cash-and-carry {raw_shares[SIGNAL_CASH_AND_CARRY]:.1f}%, reverse {raw_shares[SIGNAL_REVERSE]:.1f}%, none {raw_shares['NONE']:.1f}%",
+        ),
+        (
+            f"Days per tradeable signal {ASSUMED}",
             f"cash-and-carry {shares[SIGNAL_CASH_AND_CARRY]:.1f}%, reverse {shares[SIGNAL_REVERSE]:.1f}%, none {shares['NONE']:.1f}%",
         ),
         (
-            f"Locked return on cash-and-carry signal days, annualised {ASSUMED}",
+            f"Locked return on tradeable cash-and-carry days, annualised {ASSUMED}",
             f"mean {side(SIGNAL_CASH_AND_CARRY, 'avg_locked_return_ann_pct')}, median {side(SIGNAL_CASH_AND_CARRY, 'median_locked_return_ann_pct')}, best {side(SIGNAL_CASH_AND_CARRY, 'best_locked_return_ann_pct')}",
         ),
         (
-            f"Locked return on reverse signal days, annualised {ASSUMED}",
+            f"Locked return on tradeable reverse days, annualised {ASSUMED}",
             f"mean {side(SIGNAL_REVERSE, 'avg_locked_return_ann_pct')}, median {side(SIGNAL_REVERSE, 'median_locked_return_ann_pct')}, best {side(SIGNAL_REVERSE, 'best_locked_return_ann_pct')}",
         ),
         (f"Days cash-and-carry made money after all costs {ASSUMED}", f"{len(profitable) / len(economics) * 100:.1f}%"),
@@ -130,6 +136,10 @@ def findings(tables: dict[str, pd.DataFrame]) -> list[str]:
         own = economics.loc[economics["commodity"] == commodity]
         return (own["signal"] == signal).mean() * 100
 
+    def tradeable(commodity: str, signal: str) -> float:
+        own = economics.loc[economics["commodity"] == commodity]
+        return (own["tradeable_signal"] == signal).mean() * 100
+
     def profitable(commodity: str) -> float:
         own = economics.loc[economics["commodity"] == commodity]
         return (own["cc_net_profit"] > 0).mean() * 100
@@ -152,8 +162,8 @@ def findings(tables: dict[str, pd.DataFrame]) -> list[str]:
         "### 2. Guar seed is a reverse-arb market; jeera is two-sided",
         "",
         f"Guar seed futures sat below fair value on {share('GUARSEED', SIGNAL_REVERSE):.0f}% of days and cash-and-carry made money after all costs on only "
-        f"{profitable('GUARSEED'):.0f}% {ASSUMED}. Jeera split almost evenly: {share('JEERA', SIGNAL_CASH_AND_CARRY):.0f}% cash-and-carry signals, "
-        f"{share('JEERA', SIGNAL_REVERSE):.0f}% reverse, profitable on {profitable('JEERA'):.0f}% of days {ASSUMED}. "
+        f"{profitable('GUARSEED'):.0f}% {ASSUMED}. Jeera split almost evenly: a tradeable cash-and-carry on {tradeable('JEERA', SIGNAL_CASH_AND_CARRY):.0f}% of days "
+        f"and a tradeable reverse arb on {tradeable('JEERA', SIGNAL_REVERSE):.0f}% {ASSUMED}. "
         "The reverse side persists because it cannot be arbitraged from scratch: physical goods cannot be borrowed and sold short, "
         "so only someone already holding stock can sell spot and buy futures. A discount in futures is a payment to stockists, not free money.",
         "",
@@ -198,8 +208,8 @@ def write_report(tables: dict[str, pd.DataFrame], tbill: pd.DataFrame) -> Path:
         "- **Net profit** deducts every cost including funding at T-bill plus the spread. Positive means the trade beats borrowing.",
         "- **Cash-and-carry return** is the annualised return on the cash invested after physical and transaction costs but before funding. "
         "It is the figure to compare with the T-bill yield; funding is left out so it is not counted twice.",
-        "- **Signals** compare futures with fair value (spot plus funding plus storage). They ignore the one-off assaying and handling costs, "
-        "so a cash-and-carry signal is not always a profitable trade; the net profit column settles that.",
+        "- **Raw signals** compare futures with fair value (spot plus funding plus storage) and ignore the one-off assaying and handling costs. "
+        "A signal is **tradeable** only if the trade also makes money after all costs. Headlines and the opportunity log use the tradeable signal.",
         "",
     ]
     for commodity, details in commodities.items():
