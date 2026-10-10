@@ -1,0 +1,23 @@
+# Commodities covered by the monitor.
+# Symbols, lot sizes and basis centres were read from the NCDEX bhavcopy on
+# 2026-10-09 (see reports/phase1_data_check.md) and the contract specifications.
+
+[JEERA]
+name            = "Jeera (cumin)"
+futures_symbol  = "JEERAUNJHA"      # TckrSymb in the NCDEX bhavcopy
+basis_centre    = "Unjha"           # futures are quoted ex-warehouse Unjha, excl. GST
+other_centres   = ["Jodhpur"]       # additional delivery centre, at a premium/discount
+lot_size_mt     = 3
+quote_unit      = "Rs/quintal"
+delivery        = "compulsory"
+spec_source     = "https://www.ncdex.com/public/uploads/downloads/Contract%20Specifications%20-%20Jeera%20Futures%20070624_1719317912.pdf"
+
+[GUARSEED]
+name            = "Guar seed"
+futures_symbol  = "GUARSEED10"
+basis_centre    = "Jodhpur"         # NOT Bikaner: Bikaner is an additional delivery centre
+other_centres   = ["Bikaner", "Nokha", "Sri Ganganagar", "Deesa"]
+lot_size_mt     = 5                 # the "10" in the symbol is a legacy label
+quote_unit      = "Rs/quintal"
+delivery        = "compulsory"
+spec_source     = "https://www.ncdex.com/products/GUARSEED10"

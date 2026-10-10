@@ -1,0 +1,70 @@
+# Carry-cost inputs for the cash-and-carry trade.
+#
+# Every item carries a `status`:
+#   confirmed  = value read from the linked source document during Phase 1
+#   to_verify  = value from general market knowledge, NOT yet checked against a source
+#   missing    = no value yet; the source could not be fetched automatically
+#
+# Nothing here is used in calculations until Phase 3. Items that are not
+# "confirmed" must be checked by hand before the numbers are presented.
+
+[exchange_transaction_fee]
+status      = "confirmed"
+value       = 5.8
+unit        = "Rs per lakh of futures turnover"
+effective   = "2024-10-01"
+note        = "Flat rate for all futures contracts. Charged on the futures leg only."
+source      = "NCDEX Master Circular - Trading Operations, NCDEX/TRADING-013/2026 (cites NCDEX/TRADING-042/2024), p.18"
+source_url  = "https://www.ncdex.com/public/uploads/circulars/Master%20Circular%20-%20Trading%20Operations_1777377096.pdf"
+
+[warehouse_storage.JEERA]
+status      = "missing"
+unit        = "Rs per MT per day (expected)"
+note        = "Published by NCCL as 'Indicative storage and assaying charges'. The page sits behind a browser check, so open it by hand and copy the Unjha rate."
+source_url  = "https://www.nccl.co.in/warehousing/warehouse-data"
+
+[warehouse_storage.GUARSEED]
+status      = "missing"
+unit        = "Rs per MT per day (expected)"
+note        = "Same NCCL document as jeera; copy the Jodhpur rate."
+source_url  = "https://www.nccl.co.in/warehousing/warehouse-data"
+
+[assaying]
+status      = "missing"
+unit        = "Rs per sample / per lot"
+note        = "Same NCCL document. Paid by the depositor (the arbitrageur, as seller)."
+source_url  = "https://www.nccl.co.in/warehousing/warehouse-data"
+
+[handling_and_delivery]
+status      = "missing"
+unit        = "Rs per MT"
+note        = "Loading/unloading, sampling, weighing at the warehouse, plus NCCL delivery charges. Seller bears all costs up to pay-in (NCCL Logistics Master Circular, section 10)."
+source_url  = "https://ncdex.com/public/uploads/circulars/Master%20Circular_Logistics_09.04.2025_1744112166.pdf"
+
+[insurance]
+status      = "to_verify"
+note        = "Stock in NCCL-accredited warehouses is insured by the warehouse service provider; usually bundled into the storage charge. Confirm from the NCCL charges document."
+
+[interest_on_funds]
+status      = "to_verify"
+note        = "Model assumption, not a published fee. Default: fund the spot purchase at the 91-day T-bill yield plus a spread (set in Phase 3). Margin on the short futures leg also ties up capital."
+
+[brokerage]
+status      = "to_verify"
+note        = "Negotiated per client; a prop/arb desk pays close to zero. Expose as a user input in the dashboard rather than hardcoding."
+
+[sebi_turnover_fee]
+status      = "to_verify"
+note        = "SEBI turnover fee on agri commodity derivatives; believed to be Re 1 per crore. Check the current SEBI circular."
+
+[stamp_duty]
+status      = "to_verify"
+note        = "Believed to be 0.002% on the buy side of commodity futures. Check."
+
+[commodity_transaction_tax]
+status      = "to_verify"
+note        = "Agricultural commodities are believed exempt from CTT. Check that jeera and guar seed are both on the exempt list."
+
+[gst]
+status      = "to_verify"
+note        = "18% on brokerage and exchange fees. Storage of agricultural produce may be exempt, and GST on the goods themselves applies at delivery (futures are quoted excl. GST). Needs a proper check for each commodity."
