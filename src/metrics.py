@@ -179,6 +179,8 @@ def cash_and_carry(spot, futures_price, days, tbill_pct, costs: CostInputs) -> d
         "cc_fees_ex_gst": transaction - leg["gst_on_fees"],
         "cc_gst": leg["gst_on_fees"] + warehouse_gst,
         "cc_total_costs": funding + non_funding_costs,
+        "cc_carry_profit": gross - non_funding_costs,  # before funding
+        "cc_holding_return_pct": (gross - non_funding_costs) / spot * 100,  # before funding, not annualised
         "cc_net_profit": net_profit,
         "cc_net_profit_pct": net_profit / spot * 100,
         "cc_carry_return_pct": carry_return,
@@ -542,6 +544,166 @@ def liquidity(basis: pd.DataFrame, lot_size_mt: float, rules: Rules) -> pd.DataF
         "open_interest_lots", "volume_rs_crore", "open_interest_rs_crore", "avg_volume_mt", "capacity_lots", "capacity_rs_crore",
     ]  # fmt: skip
     return active[columns].reset_index(drop=True)
+
+
+# --------------------------------------------------------------------------- #
+# Signal finder: step-by-step calculator, best dates, and why they happened
+# --------------------------------------------------------------------------- #
+
+RANK_BY_ANNUALISED = "annualised"  # main table: annualised return, contracts with 15+ days to run
+RANK_BY_RUPEES = "rupees"  # net Rs per quintal, any days to expiry
+RANK_SHORT_DATED = "short_dated"  # annualised return, under 15 days to expiry (exaggerated)
+
+
+def trade_calculator(spot, futures_price, days, tbill_pct, costs: CostInputs) -> dict:
+    """Both trades on one day, line by line, in Rs per quintal.
+
+    Returns {"carry": [...], "reverse": [...], "summary": {...}}. Each line is
+    (label, formula in words, amount). Every amount comes from `cash_and_carry`,
+    `reverse_arb` and `futures_leg_costs`, so the calculator can never disagree
+    with the rest of the dashboard.
+    """
+    carry = cash_and_carry(spot, futures_price, days, tbill_pct, costs)
+    reverse = reverse_arb(spot, futures_price, days, tbill_pct, costs)
+    sell_leg = futures_leg_costs(futures_price, costs, buys_futures=False)
+    buy_leg = futures_leg_costs(futures_price, costs, buys_futures=True)
+    gst_note = f" + {costs.gst_pct:.0f}% GST" if costs.gst_on_storage_and_assaying else ""
+    funding_rate = tbill_pct + costs.funding_spread_pct
+    funding = funding_cost(spot, tbill_pct, days, costs)
+    storage = storage_cost(days, costs)
+
+    carry_lines = [
+        ("Gross basis", "futures - spot", carry["cc_gross"]),
+        ("Storage", f"Rs {costs.storage_rs_per_quintal_per_day:.2f} x {days} days{gst_note}", -carry["cc_storage"]),
+        ("Assaying", f"Rs {costs.assaying_rs_per_quintal:.0f} per quintal, once{gst_note}", -carry["cc_assaying"]),
+        ("Handling", f"Rs {costs.handling_rs_per_quintal:.0f} per quintal, once", -carry["cc_handling"]),
+        ("Exchange fee", f"futures x Rs {costs.exchange_fee_rs_per_lakh} per lakh", -sell_leg["exchange_fee"]),
+        ("SEBI fee", f"futures x Rs {costs.sebi_fee_rs_per_crore:.0f} per crore", -sell_leg["sebi_fee"]),
+        ("Brokerage", f"futures x Rs {costs.brokerage_rs_per_lakh:.0f} per lakh", -sell_leg["brokerage"]),
+        ("GST on fees", f"{costs.gst_pct:.0f}% of exchange fee and brokerage", -sell_leg["gst_on_fees"]),
+        ("Stamp duty", "nil: futures are sold, duty is on the buyer", -sell_leg["stamp_duty"]),
+        ("= Carry profit before funding", "gross - all costs above", carry["cc_carry_profit"]),
+        ("Funding", f"spot x {funding_rate:.2f}% x {days}/365", -carry["cc_funding"]),
+        ("= Net profit after funding", "carry profit - funding", carry["cc_net_profit"]),
+    ]
+    reverse_lines = [
+        ("Price gap", "spot - futures", reverse["rev_price_gap"]),
+        ("Avoided funding", f"spot x {funding_rate:.2f}% x {days}/365", funding),
+        ("Avoided storage", f"Rs {costs.storage_rs_per_quintal_per_day:.2f} x {days} days{gst_note}", storage),
+        ("Exchange fee", f"futures x Rs {costs.exchange_fee_rs_per_lakh} per lakh", -buy_leg["exchange_fee"]),
+        ("SEBI fee", f"futures x Rs {costs.sebi_fee_rs_per_crore:.0f} per crore", -buy_leg["sebi_fee"]),
+        ("Brokerage", f"futures x Rs {costs.brokerage_rs_per_lakh:.0f} per lakh", -buy_leg["brokerage"]),
+        ("GST on fees", f"{costs.gst_pct:.0f}% of exchange fee and brokerage", -buy_leg["gst_on_fees"]),
+        ("Stamp duty", f"futures x {costs.stamp_duty_pct}% (buyer pays)", -buy_leg["stamp_duty"]),
+        ("= Net benefit", "gap + avoided carry - transaction costs", reverse["rev_benefit"]),
+    ]
+    fair = fair_value(spot, days, tbill_pct, costs)
+    return {
+        "carry": carry_lines,
+        "reverse": reverse_lines,
+        "summary": {
+            "carry_profit": carry["cc_carry_profit"],
+            "carry_holding_pct": carry["cc_holding_return_pct"],
+            "carry_annualised_pct": carry["cc_carry_return_pct"],
+            "carry_excess_over_tbill": carry["cc_excess_over_tbill"],
+            "carry_net_profit": carry["cc_net_profit"],
+            "reverse_benefit": reverse["rev_benefit"],
+            "reverse_holding_pct": reverse["rev_benefit_pct"],
+            "reverse_annualised_pct": reverse["rev_return_pct"],
+            "reverse_excess_over_tbill": reverse["rev_return_pct"] - tbill_pct,
+            "fair_value": fair,
+            "mispricing_pct": (futures_price - fair) / spot * 100,
+        },
+    }
+
+
+def signal_days(economics: pd.DataFrame, settlements: pd.DataFrame) -> pd.DataFrame:
+    """Every tradeable day with the return of its tradeable side, one row per day (ONE commodity).
+
+    net_rs          profit after ALL costs including funding (what makes a day tradeable)
+    holding_pct     return over the holding period; for cash-and-carry this is before funding
+    annualised_pct  holding_pct x 365 / days to expiry, the figure compared with the T-bill
+    The last two columns show how the contract actually ended, once it has expired.
+    """
+    days = economics.loc[economics["tradeable_signal"] != SIGNAL_NONE].copy()
+    is_carry = days["tradeable_signal"] == SIGNAL_CASH_AND_CARRY
+    days["side"] = days["tradeable_signal"]
+    days["net_rs"] = np.where(is_carry, days["cc_net_profit"], days["rev_benefit"])
+    days["holding_pct"] = np.where(is_carry, days["cc_holding_return_pct"], days["rev_benefit_pct"])
+    days["annualised_pct"] = np.where(is_carry, days["cc_carry_return_pct"], days["rev_return_pct"])
+    days["excess_over_tbill"] = days["annualised_pct"] - days["tbill_pct"]
+    days["short_dated"] = days["days_to_expiry"] < SHORT_DATED_DAYS
+    days = days.merge(settlements[["contract_symbol", "final_settlement", "convergence_error_pct"]], on="contract_symbol", how="left")
+    columns = [
+        "date", "commodity", "side", "contract_symbol", "days_to_expiry", "spot", "settlement_price", "basis_pct",
+        "net_rs", "holding_pct", "annualised_pct", "excess_over_tbill", "tbill_pct", "short_dated",
+        "final_settlement", "convergence_error_pct",
+    ]  # fmt: skip
+    return days[columns].rename(columns={"settlement_price": "futures"}).reset_index(drop=True)
+
+
+def best_dates(days: pd.DataFrame, side: str, ranking: str = RANK_BY_ANNUALISED, top: int = 10) -> pd.DataFrame:
+    """The best tradeable days for one side.
+
+    RANK_BY_ANNUALISED  by annualised return, only days with 15+ days to expiry (the main table)
+    RANK_BY_RUPEES      by net Rs per quintal, any days to expiry
+    RANK_SHORT_DATED    by annualised return, under 15 days to expiry; exaggerated by annualisation
+    """
+    own = days.loc[days["side"] == side]
+    if ranking == RANK_BY_ANNUALISED:
+        ranked = own.loc[~own["short_dated"]].sort_values("annualised_pct", ascending=False)
+    elif ranking == RANK_SHORT_DATED:
+        ranked = own.loc[own["short_dated"]].sort_values("annualised_pct", ascending=False)
+    else:
+        ranked = own.sort_values("net_rs", ascending=False)
+    return ranked.head(top).reset_index(drop=True)
+
+
+def describe_best_dates(name: str, side: str, days: pd.DataFrame, economics: pd.DataFrame, arrival_months: list[int] | None = None) -> str:
+    """One paragraph: when this side's returns peaked, what those days had in common, and how often they came.
+
+    Three things are checked for the top 10 days (15+ days to expiry): how far
+    from expiry they were, what spot had done over the previous five trading
+    days, and whether they fell in the crop's arrival season.
+    """
+    label = "cash-and-carry" if side == SIGNAL_CASH_AND_CARRY else "reverse arb"
+    top = best_dates(days, side, RANK_BY_ANNUALISED)
+    own = days.loc[(days["side"] == side) & ~days["short_dated"]]
+    if top.empty:
+        return f"{name} had no tradeable {label} day with at least {SHORT_DATED_DAYS} days to expiry in this period."
+
+    best = top.iloc[0]
+    months = top["date"].dt.strftime("%b %Y").value_counts()
+    month_text = f"{months.iloc[0]} of the top {len(top)} fell in {months.index[0]}"
+
+    spot_move = economics.set_index("date")["spot"].pct_change(5) * 100
+    moves = spot_move.reindex(top["date"]).dropna()
+    typical_move = moves.median() if len(moves) else float("nan")
+    if side == SIGNAL_CASH_AND_CARRY:
+        move_reason = "futures ran ahead of spot" if typical_move >= 0 else "spot fell faster than futures"
+    else:
+        move_reason = "spot jumped and futures did not follow" if typical_move >= 0 else "futures fell further than spot"
+    move_text = f"spot had moved {typical_move:+.1f}% over the previous five trading days ({move_reason})" if len(moves) else ""
+
+    typical_dte, all_dte = top["days_to_expiry"].median(), own["days_to_expiry"].median()
+    dte_text = f"they came with a median of {typical_dte:.0f} days to expiry, against {all_dte:.0f} for all tradeable {label} days"
+
+    season_text = ""
+    if arrival_months:
+        in_season = int(top["date"].dt.month.isin(arrival_months).sum())
+        season_text = f" {in_season} of the {len(top)} fell in the arrival season."
+
+    # How often: runs of consecutive trading days on which this side was tradeable.
+    tradeable = (economics["tradeable_signal"] == side).reset_index(drop=True)
+    runs = int((tradeable & ~tradeable.shift(fill_value=False)).sum())
+    share = tradeable.mean() * 100
+    return (
+        f"{name} {label} peaked on {best['date']:%d %b %Y} at {best['annualised_pct']:.1f}% annualised "
+        f"(Rs {best['net_rs']:,.0f} per quintal net, {best['days_to_expiry']} days to expiry). {month_text}; {dte_text}"
+        + (f"; {move_text}." if move_text else ".")
+        + season_text
+        + f" This side was tradeable on {int(tradeable.sum())} days ({share:.0f}%), in {runs} separate windows averaging {tradeable.sum() / max(runs, 1):.1f} days each."
+    )
 
 
 # --------------------------------------------------------------------------- #

@@ -12,6 +12,7 @@ from tabs.convergence import bucket_figure
 CHART_HEIGHT = 250
 
 TAB_GUIDE = [
+    ("Signal Finder", "both trades worked through for any date, and the best dates of the year for each side."),
     ("Cash vs Futures", "how far futures sit from spot each day, and whether today is unusual."),
     ("Arb Economics", "what each side earns after costs, where the costs go, and every tradeable day."),
     ("Term Structure", "the shape of the futures curve and how steeply it pays to carry stock."),
@@ -33,7 +34,7 @@ def signal_share_figure(peers) -> go.Figure:
         figure.add_bar(
             y=peers["name"], x=peers[column], name=label, orientation="h", marker=dict(color=colour, line=dict(color=theme.SURFACE, width=2)),
             text=[f"{value:.0f}%" for value in peers[column]], textposition="inside", insidetextanchor="middle", textangle=0,
-            textfont=dict(size=12, color="white" if colour != theme.FAINT else theme.INK),
+            textfont=dict(size=12, color="#ffffff" if colour != theme.FAINT else theme.INK),
             hovertemplate=f"{label}: %{{x:.1f}}% of days<extra></extra>",
         )  # fmt: skip
     figure.update_layout(barmode="stack", bargap=0.35, hovermode="closest", legend=dict(font=dict(size=11), traceorder="normal"), uniformtext=dict(minsize=11, mode="show"))
@@ -62,8 +63,8 @@ def limit_figure(peers) -> go.Figure:
 
 def compact(figure: go.Figure) -> go.Figure:
     """Tighten a full-size chart so it reads inside a card."""
-    figure.update_traces(textfont=dict(size=12, color=theme.INK), cliponaxis=False)
-    figure.update_layout(uniformtext=dict(minsize=12, mode="show"), bargap=0.15)  # stop Plotly shrinking the labels to fit
+    figure.update_traces(textfont=dict(size=11, color=theme.INK), cliponaxis=False, texttemplate='%{y:+.1f}%')
+    figure.update_layout(uniformtext=dict(minsize=11, mode="show"), bargap=0.15)  # stop Plotly shrinking the labels to fit
     figure.update_xaxes(tickangle=0, tickfont=dict(size=10))
     figure.update_yaxes(title="Basis, % of spot")
     return figure

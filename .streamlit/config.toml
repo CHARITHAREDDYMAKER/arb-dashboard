@@ -1,9 +1,11 @@
+# Dark "terminal" theme by default. The sidebar's Light theme toggle switches
+# these at run time (see app/theme.py), using the light palette defined there.
 [theme]
-base = "light"
-primaryColor = "#2a78d6"
-backgroundColor = "#fcfcfb"
-secondaryBackgroundColor = "#f3f2ee"
-textColor = "#0b0b0b"
+base = "dark"
+primaryColor = "#3987e5"
+backgroundColor = "#080d19"
+secondaryBackgroundColor = "#0d1424"
+textColor = "#eef1f7"
 font = "sans serif"
 
 [browser]

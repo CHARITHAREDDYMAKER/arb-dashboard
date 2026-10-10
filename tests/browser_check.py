@@ -66,12 +66,12 @@ def main() -> int:
         page.goto(f"{URL}/?commodity=JEERA")
         settle(page)
         defaults = header_text(page)
-        record("App loads on jeera without errors", "Jeera" in page.locator("h2").first.inner_text() and not has_error(page))
+        record("App loads on jeera without errors", "Jeera" in page.locator(".legend-note b").first.inner_text() and not has_error(page))
 
         # Commodity switch
         page.get_by_test_id("stRadioGroup").get_by_text("Guar seed").click()
         settle(page)
-        record("Switch to guar seed", "Guar seed" in page.locator("h2").first.inner_text() and not has_error(page))
+        record("Switch to guar seed", "Guar seed" in page.locator(".legend-note b").first.inner_text() and not has_error(page))
         record("Cold-storage toggle is hidden for guar seed", page.get_by_text("Jeera in cold storage").count() == 0)
         page.get_by_test_id("stRadioGroup").get_by_text("Jeera", exact=True).click()
         settle(page)
@@ -122,11 +122,54 @@ def main() -> int:
         settle(page)
         record("Reset to defaults restores the header", header_text(page) == defaults and not has_error(page))
 
+        # Signal Finder: date picker, timeline click and ranking switch
+        page.get_by_role("tab", name="Signal Finder").click()
+        settle(page)
+        calculator = page.locator(".calc").first
+        before = calculator.inner_text()
+        page.get_by_label("Trade date (or click a point on the timeline below)").click()
+        page.keyboard.type("27 Apr 2026")  # inside the Jan to Jun range chosen earlier
+        page.keyboard.press("Enter")
+        settle(page)
+        after_pick = calculator.inner_text()
+        record("Signal Finder: picking a date refills the calculator", after_pick != before and "JEERAUNJHA20MAY2026" in page.locator("body").inner_text() and not has_error(page))
+
+        # Plotly listens for clicks on a layer above the markers, so click by screen position.
+        marker = page.locator(".js-plotly-plot:visible .scatterlayer .trace").nth(2).locator("path.point").nth(3)
+        marker.scroll_into_view_if_needed()
+        page.wait_for_timeout(500)
+        box = marker.bounding_box()
+        page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+        settle(page)
+        record("Signal Finder: clicking a timeline marker refills the calculator", calculator.inner_text() != after_pick and not has_error(page))
+
+        table = page.locator('[data-testid="stDataFrame"]:visible').first
+        table.scroll_into_view_if_needed()
+        page.wait_for_timeout(800)
+        shot_before = table.screenshot()
+        page.get_by_text("Most Rs per quintal (any days to expiry)").first.click()
+        settle(page)
+        record("Signal Finder: switching the ranking changes the table", table.screenshot() != shot_before and not has_error(page))
+
+        # Theme toggle (a server-wide setting, so it is always switched back)
+        background = "getComputedStyle(document.querySelector('.stApp')).backgroundColor"
+        dark = page.evaluate(background)
+        page.get_by_test_id("stSidebar").get_by_text("Light theme").click()
+        page.wait_for_timeout(1500)
+        settle(page)
+        light = page.evaluate(background)
+        record("Light theme toggle changes the page", light != dark and not has_error(page), f"{dark} -> {light}")
+        page.get_by_test_id("stSidebar").get_by_text("Light theme").click()
+        page.wait_for_timeout(1500)
+        settle(page)
+        record("Theme switches back to dark", page.evaluate(background) == dark and not has_error(page))
+
         # Every tab still draws after all that
         for tab in page.get_by_role("tab").all():
             tab.click()
             settle(page)
-            record(f"Tab '{tab.inner_text().strip()}' draws", not has_error(page) and page.locator(".js-plotly-plot:visible, [data-testid='stDataFrame']:visible").count() > 0)
+            name = tab.inner_text().strip().split("\n")[-1]
+            record(f"Tab '{name}' draws", not has_error(page) and page.locator(".js-plotly-plot:visible, [data-testid='stDataFrame']:visible, .calc:visible").count() > 0)
         browser.close()
 
     failed = [step for step, passed, _ in results if not passed]

@@ -246,3 +246,75 @@ def test_longer_dated_trade_leads_with_the_annualised_return():
 
 def test_no_tradeable_signal_says_so():
     assert metrics.describe_trade(trade_day(10, "NONE")) == "neither side makes money after all costs"
+
+
+# ---- signal finder ---------------------------------------------------------- #
+
+
+def amounts(lines: list[tuple]) -> dict:
+    return {label: amount for label, _, amount in lines}
+
+
+def test_calculator_carry_lines_match_the_cost_model_exactly():
+    calc = metrics.trade_calculator(SPOT, FUTURES, DAYS, TBILL, COSTS)
+    model = metrics.cash_and_carry(SPOT, FUTURES, DAYS, TBILL, COSTS)
+    lines = amounts(calc["carry"])
+    assert lines["Gross basis"] == model["cc_gross"]
+    assert lines["Storage"] == -model["cc_storage"]
+    assert lines["Assaying"] == -model["cc_assaying"]
+    assert lines["Handling"] == -model["cc_handling"]
+    assert lines["Funding"] == -model["cc_funding"]
+    assert lines["= Carry profit before funding"] == model["cc_carry_profit"]
+    assert lines["= Net profit after funding"] == model["cc_net_profit"]
+    assert calc["summary"]["carry_annualised_pct"] == model["cc_carry_return_pct"]
+    assert calc["summary"]["carry_excess_over_tbill"] == model["cc_excess_over_tbill"]
+
+
+def test_calculator_carry_lines_add_up():
+    calc = metrics.trade_calculator(SPOT, FUTURES, DAYS, TBILL, COSTS)
+    lines = calc["carry"]
+    before_funding = sum(amount for label, _, amount in lines if not label.startswith("=") and label != "Funding")
+    assert before_funding == pytest.approx(calc["summary"]["carry_profit"])
+    assert before_funding + amounts(lines)["Funding"] == pytest.approx(calc["summary"]["carry_net_profit"])
+    # holding-period return x 365 / days = annualised return
+    assert calc["summary"]["carry_holding_pct"] * 365 / DAYS == pytest.approx(calc["summary"]["carry_annualised_pct"])
+
+
+def test_calculator_reverse_lines_match_and_add_up():
+    futures = 19_800.0
+    calc = metrics.trade_calculator(SPOT, futures, DAYS, TBILL, COSTS)
+    model = metrics.reverse_arb(SPOT, futures, DAYS, TBILL, COSTS)
+    lines = amounts(calc["reverse"])
+    assert lines["Price gap"] == model["rev_price_gap"]
+    assert lines["Avoided funding"] + lines["Avoided storage"] == pytest.approx(model["rev_avoided_carry"])
+    assert lines["Stamp duty"] == pytest.approx(-0.396)  # 19,800 x 0.002%, charged because futures are bought
+    assert lines["= Net benefit"] == model["rev_benefit"]
+    assert sum(amount for label, amount in lines.items() if not label.startswith("=")) == pytest.approx(model["rev_benefit"])
+    assert calc["summary"]["reverse_annualised_pct"] == model["rev_return_pct"]
+
+
+def make_signal_days() -> pd.DataFrame:
+    rows = [
+        # date, side, days to expiry, net Rs, annualised %
+        ("2026-01-05", "CASH_AND_CARRY", 40, 100.0, 12.0),
+        ("2026-01-06", "CASH_AND_CARRY", 39, 300.0, 20.0),
+        ("2026-01-07", "CASH_AND_CARRY", 8, 150.0, 90.0),
+        ("2026-01-08", "REVERSE", 30, 250.0, 25.0),
+        ("2026-01-09", "CASH_AND_CARRY", 20, 50.0, 30.0),
+    ]
+    frame = pd.DataFrame(rows, columns=["date", "side", "days_to_expiry", "net_rs", "annualised_pct"])
+    frame["date"] = pd.to_datetime(frame["date"])
+    frame["short_dated"] = frame["days_to_expiry"] < metrics.SHORT_DATED_DAYS
+    return frame
+
+
+def test_main_ranking_excludes_short_dated_days():
+    best = metrics.best_dates(make_signal_days(), "CASH_AND_CARRY", metrics.RANK_BY_ANNUALISED)
+    assert list(best["annualised_pct"]) == [30.0, 20.0, 12.0]  # the 90% day has 8 days to run and is left out
+
+
+def test_rupee_ranking_uses_every_day_and_short_dated_ranking_only_short_ones():
+    days = make_signal_days()
+    assert list(metrics.best_dates(days, "CASH_AND_CARRY", metrics.RANK_BY_RUPEES)["net_rs"]) == [300.0, 150.0, 100.0, 50.0]
+    assert list(metrics.best_dates(days, "CASH_AND_CARRY", metrics.RANK_SHORT_DATED)["annualised_pct"]) == [90.0]
+    assert list(metrics.best_dates(days, "REVERSE", metrics.RANK_BY_ANNUALISED)["net_rs"]) == [250.0]

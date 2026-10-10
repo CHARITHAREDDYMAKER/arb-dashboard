@@ -70,15 +70,14 @@ Add `?commodity=GUARSEED` to the URL to open directly on guar seed.
 
 ## Refreshing the data before the interview
 
-Run this the evening before, after NCDEX publishes the day's bhavcopy (about
-18:00 IST), and again on the morning if you want the previous day included.
+Run this the evening before, once NCDEX has published the day's bhavcopy, and again on the morning if you want the previous day included.
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements-dev.txt     # first time only
 python -m src.pipeline --update         # fetch new trading days, rebuild the tables
 python -m src.build_metrics             # rebuild the metric tables and the Phase 3 report
-python -m pytest                        # 38 tests should pass (takes about 90 seconds)
+python -m pytest                        # 43 tests should pass (takes about a minute)
 git add -A
 git commit -m "Refresh data"
 git push

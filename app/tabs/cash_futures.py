@@ -36,7 +36,7 @@ def price_and_basis_figure(view: View, show_next: bool, show_far: bool) -> go.Fi
     rolls = economics.loc[economics["contract_symbol"] != economics["contract_symbol"].shift()].iloc[1:]
     figure.add_scatter(
         x=rolls["date"], y=rolls["settlement_price"], name="Roll to next contract", mode="markers",
-        marker=dict(symbol="diamond", size=8, color="white", line=dict(color=theme.FUTURES, width=2)), row=1, col=1,
+        marker=dict(symbol="diamond", size=8, color=theme.PAGE, line=dict(color=theme.FUTURES, width=2)), row=1, col=1,
     )  # fmt: skip
     figure.add_bar(x=economics["date"], y=economics["basis"], name="Basis (Rs)", marker_color=theme.FUTURES, showlegend=False, row=2, col=1)
     figure.add_scatter(

@@ -108,10 +108,16 @@ def peer_summary(costs_by_commodity: dict[str, CostInputs], rules: Rules) -> pd.
     for commodity, costs in costs_by_commodity.items():
         tables = compute_tables(commodity, astuple(costs), astuple(rules))
         shares = metrics.signal_shares(tables["economics"])
+        latest, previous = tables["economics"].iloc[-1], tables["economics"].iloc[-2]
         rows.append(
             {
                 "commodity": commodity,
                 "name": display_name(commodity),
+                "spot": latest["spot"],
+                "spot_change_pct": (latest["spot"] / previous["spot"] - 1) * 100,
+                "active_futures": latest["settlement_price"],
+                "basis_pct": latest["basis_pct"],
+                "signal": latest["tradeable_signal"],
                 "carry_days_pct": shares[metrics.SIGNAL_CASH_AND_CARRY],
                 "reverse_days_pct": shares[metrics.SIGNAL_REVERSE],
                 "no_trade_days_pct": shares[metrics.SIGNAL_NONE],

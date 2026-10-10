@@ -51,6 +51,7 @@ def render() -> Inputs:
 
     with st.sidebar:
         st.markdown("### Arbitrage Monitor")
+        st.toggle("Light theme", key="light_theme", help="The dashboard is dark by default. On a shared deployment this switches the theme for every viewer.")
         keys = list(COMMODITY_LABELS)
         requested = st.query_params.get("commodity", keys[0])  # lets a link open on a given commodity
         commodity = st.radio(

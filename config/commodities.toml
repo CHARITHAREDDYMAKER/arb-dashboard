@@ -13,6 +13,7 @@ other_centres   = ["Jodhpur"]       # additional delivery centre, at a premium/d
 lot_size_mt     = 3
 quote_unit      = "Rs/quintal"
 delivery        = "compulsory"
+arrival_months  = [2, 3, 4]         # Feb to Apr: new crop reaches the mandis (general market knowledge, not from a cited source)
 spec_source     = "https://www.ncdex.com/public/uploads/downloads/Contract%20Specifications%20-%20Jeera%20Futures%20070624_1719317912.pdf"
 
 [GUARSEED]
@@ -23,4 +24,5 @@ other_centres   = ["Bikaner", "Nokha", "Sri Ganganagar", "Deesa"]
 lot_size_mt     = 5                 # the "10" in the symbol is a legacy label
 quote_unit      = "Rs/quintal"
 delivery        = "compulsory"
+arrival_months  = [10, 11, 12]      # Oct to Dec: kharif crop arrivals (general market knowledge, not from a cited source)
 spec_source     = "https://www.ncdex.com/products/GUARSEED10"

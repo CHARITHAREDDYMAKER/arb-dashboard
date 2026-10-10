@@ -1,4 +1,6 @@
-"""Shared building blocks: KPI cards, the signal badge, and the chart wrapper."""
+"""Shared building blocks: KPI cards, sparklines, the signal badge, and the chart wrapper."""
+
+import math
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -10,49 +12,53 @@ from src.metrics import SIGNAL_CASH_AND_CARRY, SIGNAL_REVERSE
 
 SHORT_DATED_NOTE = "short-dated, annualisation exaggerates"
 
-# Label, colour and a shape, so the signal never depends on colour alone.
-SIGNAL_STYLE = {
-    SIGNAL_CASH_AND_CARRY: ("Cash-and-carry", theme.CARRY, "▲"),
-    SIGNAL_REVERSE: ("Reverse arb", theme.REVERSE, "▼"),
-    "NONE": ("No trade", theme.MUTED, "■"),
-}
 
-CSS = f"""
-<style>
-.block-container {{ padding-top: 2.2rem; padding-bottom: 3rem; max-width: 1500px; }}
-.kpi {{ border: 1px solid {theme.GRID}; border-radius: 8px; padding: 10px 12px; background: white; min-height: 132px; margin-bottom: 14px; }}
-.kpi-label {{ font-size: 0.74rem; color: {theme.MUTED}; text-transform: uppercase; letter-spacing: 0.04em; }}
-.kpi-value {{ font-size: 1.28rem; font-weight: 600; color: {theme.INK}; line-height: 1.5; white-space: nowrap; }}
-.kpi-value.greyed {{ color: {theme.MUTED}; font-weight: 500; }}
-.kpi-sub {{ font-size: 0.78rem; color: {theme.MUTED}; line-height: 1.35; }}
-.badge {{ display: inline-block; padding: 1px 10px; border-radius: 999px; color: white; font-size: 0.95rem; font-weight: 600; }}
-.question {{ font-size: 1.05rem; font-weight: 600; color: {theme.INK}; margin: 0.9rem 0 0 0; }}
-.takeaway {{ font-size: 0.9rem; color: {theme.SPOT}; margin: 0 0 1.1rem 0; border-left: 3px solid {theme.FUTURES}; padding-left: 10px; }}
-.flow {{ display: flex; align-items: stretch; gap: 6px; margin: 0.6rem 0 1rem 0; }}
-.flow-step {{ flex: 1; border: 1px solid {theme.FAINT}; border-radius: 8px; padding: 10px 12px; background: white; font-size: 0.86rem; }}
-.flow-step b {{ display: block; color: {theme.INK}; }}
-.flow-arrow {{ align-self: center; color: {theme.MUTED}; font-size: 1.2rem; }}
-.kpi-sub .greyed, .greyed {{ color: {theme.TBILL}; }}
-.unit {{ font-size: 0.8rem; font-weight: 400; color: {theme.MUTED}; }}
-.lede {{ font-size: 1.02rem; color: {theme.INK}; margin: 0.4rem 0 0.9rem 0; max-width: 1050px; }}
-.finding-title {{ font-size: 1.0rem; font-weight: 600; margin: 0; min-height: 3em; }}
-.finding-body {{ font-size: 0.87rem; color: {theme.SPOT}; margin: 0.25rem 0 0 0; min-height: 5.6em; }}
-.insight {{ font-size: 0.93rem; color: {theme.INK}; margin: 0.15rem 0; }}
-.legend-note {{ font-size: 0.8rem; color: {theme.MUTED}; }}
-</style>
-"""
+def signal_style(signal: str) -> tuple[str, str, str]:
+    """Label, colour and a shape for a signal, so it never depends on colour alone."""
+    return {
+        SIGNAL_CASH_AND_CARRY: ("Cash-and-carry", theme.CARRY, "▲"),
+        SIGNAL_REVERSE: ("Reverse arb", theme.REVERSE, "▼"),
+    }.get(signal, ("No trade", theme.TBILL, "■"))
 
 
-def inject_css() -> None:
-    st.markdown(CSS, unsafe_allow_html=True)
+def signal_badge(signal: str) -> str:
+    label, colour, shape = signal_style(signal)
+    return f'<span class="badge" style="background:{colour}; --glow:{theme.hex_to_rgba(colour, 0.55)}">{shape} {label}</span>'
 
 
-def kpi(label: str, value: str, sub: str = "", greyed: bool = False) -> None:
-    """A small card: label, headline value, one line of context. `value` may contain HTML."""
+def sparkline(values, colour: str | None = None) -> str:
+    """A small inline SVG line of recent values (no axes: it shows direction, not levels)."""
+    values = [float(value) for value in values if value is not None and not math.isnan(float(value))]
+    if len(values) < 2:
+        return ""
+    low, high = min(values), max(values)
+    spread = (high - low) or 1.0
+    step = 100 / (len(values) - 1)
+    points = " ".join(f"{index * step:.1f},{22 - (value - low) / spread * 20:.1f}" for index, value in enumerate(values))
+    colour = colour or theme.FUTURES
+    return (
+        f'<svg viewBox="0 0 100 24" preserveAspectRatio="none" role="img" aria-label="last {len(values)} trading days">'
+        f'<polyline points="{points}" fill="none" stroke="{colour}" stroke-width="1.6" vector-effect="non-scaling-stroke" '
+        'stroke-linejoin="round" stroke-linecap="round"/></svg>'
+    )
+
+
+def delta(change: float | None, text: str) -> str:
+    """Change against the previous trading day: an arrow and a colour, never colour alone."""
+    if change is None or math.isnan(change):
+        return ""
+    if abs(change) < 1e-9:
+        return f'<span class="delta-flat">● {text}</span>'
+    arrow, css_class = ("▲", "delta-up") if change > 0 else ("▼", "delta-down")
+    return f'<span class="{css_class}">{arrow} {text}</span>'
+
+
+def kpi(label: str, value: str, sub: str = "", greyed: bool = False, spark: str = "") -> None:
+    """A card: label, headline value, one line of context, and an optional sparkline. `value` may contain HTML."""
     value_class = "kpi-value greyed" if greyed else "kpi-value"
     st.markdown(
         f'<div class="kpi"><div class="kpi-label">{label}</div>'
-        f'<div class="{value_class}">{value}</div><div class="kpi-sub">{sub}</div></div>',
+        f'<div class="{value_class}">{value}</div><div class="kpi-sub">{sub}</div>{spark}</div>',
         unsafe_allow_html=True,
     )
 
@@ -64,17 +70,13 @@ def kpi_row(cards: list[dict], widths: list[float] | None = None) -> None:
             kpi(**card)
 
 
-def signal_badge(signal: str) -> str:
-    label, colour, shape = SIGNAL_STYLE[signal]
-    return f'<span class="badge" style="background:{colour}">{shape} {label}</span>'
-
-
-def chart(figure: go.Figure, question: str, takeaway: str, key: str, height: int = 360) -> None:
+def chart(figure: go.Figure, question: str, takeaway: str, key: str, height: int = 360, **plotly_arguments):
     """Draw a chart under the question it answers, with a one-line takeaway from the data."""
     st.markdown(f'<p class="question">{question}</p>', unsafe_allow_html=True)
     figure.update_layout(height=height)
-    st.plotly_chart(figure, key=key, config={"displayModeBar": False})
+    event = st.plotly_chart(figure, key=key, config={"displayModeBar": False}, **plotly_arguments)
     st.markdown(f'<p class="takeaway">{takeaway}</p>', unsafe_allow_html=True)
+    return event
 
 
 def has_rows(table: pd.DataFrame, missing: str) -> bool:
@@ -103,7 +105,7 @@ def add_expiry_lines(figure: go.Figure, expiries, row: int | None = None) -> Non
         figure.add_vline(x=expiry, line_width=1, line_dash="dot", line_color=theme.FAINT, row=row, col=1 if row else None)
 
 
-def shade_runs(figure: go.Figure, dates: pd.Series, mask: pd.Series, colour: str, opacity: float = 0.12) -> None:
+def shade_runs(figure: go.Figure, dates: pd.Series, mask: pd.Series, colour: str, opacity: float = 0.14) -> None:
     """Shade the background over each unbroken run of days where `mask` is true."""
     dates, mask = dates.reset_index(drop=True), mask.reset_index(drop=True)
     run_id = (mask != mask.shift()).cumsum()

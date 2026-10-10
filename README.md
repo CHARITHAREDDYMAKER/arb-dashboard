@@ -51,6 +51,7 @@ year. The header always shows the latest trading day.
 | Tab | Question it answers |
 |---|---|
 | Overview | What does the desk do, and what are the three findings? |
+| Signal Finder | What does each trade earn on any date, and which dates were best for each side? |
 | Cash vs Futures | How far do futures trade from spot, and is the latest basis unusual? |
 | Arb Economics | Does cash-and-carry beat the T-bill, what does reverse arb pay, and where do the costs go? |
 | Term Structure | What does the curve look like, and is the market paying to carry stock forward? |
@@ -58,7 +59,12 @@ year. The header always shows the latest trading day.
 | Rollover & Capacity | What does the roll cost, and how much size can be traded? |
 | Method & Data | The trade, the data sources, the validation evidence and the cost model. |
 
-Screenshots of every tab are in [reports/screens/](reports/screens/).
+The dashboard is dark by default; a toggle in the sidebar switches to a light
+theme. Screenshots of every tab are in [reports/screens/](reports/screens/).
+
+A full guide to every chart, card and table, with worked examples, is in
+[docs/Dashboard_Guide.md](docs/Dashboard_Guide.md) (also as a Word file,
+`docs/Dashboard_Guide.docx`).
 
 ## Data
 
@@ -111,11 +117,13 @@ config/     commodities.toml, carry_costs.toml (published charges with sources),
 tests/      unit tests, plus browser_check.py and take_screenshots.py (Playwright)
 data/       processed/ parquet files (committed), reference/ source documents, raw/ downloads (not committed)
 reports/    phase reports, interview notes, screenshots
+docs/       the dashboard guide (Markdown and Word) and the script that builds the Word file
 ```
 
 [src/metrics.py](src/metrics.py) holds pure functions with no file or network
 access. The cost model takes a `CostInputs` object, so the dashboard re-runs a
-year of data in about 10 milliseconds when an input changes. The app contains
+year of data in about 10 milliseconds when an input changes (redrawing the
+page takes a second or two). The app contains
 no metric logic of its own.
 
 ## Cost inputs
