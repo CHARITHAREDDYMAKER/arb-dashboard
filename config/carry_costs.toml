@@ -54,17 +54,45 @@ status      = "to_verify"
 note        = "Negotiated per client; a prop/arb desk pays close to zero. Expose as a user input in the dashboard rather than hardcoding."
 
 [sebi_turnover_fee]
-status      = "to_verify"
-note        = "SEBI turnover fee on agri commodity derivatives; believed to be Re 1 per crore. Check the current SEBI circular."
+status      = "confirmed"
+value       = 1.0
+unit        = "Rs per crore of turnover (0.00001%)"
+effective   = "2019-04-01"
+note        = "Concessional rate for agricultural commodity derivatives; other commodity derivatives pay Rs 10 per crore. Read from the 2019 notification; the stock-broker regulations were re-issued in 2026 and secondary sources say the rate is unchanged, so glance at the current schedule once."
+source      = "SEBI notification SEBI/LAD-NRO/GN/2019/03 dated 22 March 2019, amending Schedule V of the Stock Brokers Regulations (as reproduced in a Calcutta Stock Exchange notice)"
+source_url  = "https://www.cse-india.com/upload/cse_notice/REVISED_SEBI_TURNOVER_FEES.htm"
 
 [stamp_duty]
-status      = "to_verify"
-note        = "Believed to be 0.002% on the buy side of commodity futures. Check."
+status      = "confirmed"
+value       = 0.002
+unit        = "% of futures turnover, buy side only"
+effective   = "2020-07-01"
+note        = "Collected by the clearing corporation. In a cash-and-carry the futures are sold and then delivered, so no futures purchase takes place and this applies only if the short is bought back instead of delivered. Stamp duty on the physical delivery itself is not covered by this source."
+source      = "NSE 'SEBI Turnover Fees, STT and Other levies' page, row 'Commodity Futures 0.002% Buyer' (Finance Act 2019 amendment to the Indian Stamp Act, 1899)"
+source_url  = "https://www.nseindia.com/static/invest/first-time-investor-sebi-turnover-fees-stt-other-levies"
 
 [commodity_transaction_tax]
-status      = "to_verify"
-note        = "Agricultural commodities are believed exempt from CTT. Check that jeera and guar seed are both on the exempt list."
+status      = "confirmed"
+value       = 0.0
+unit        = "% of futures sell-side turnover"
+effective   = "2013-07-01"
+note        = "CTT is 0.01% on the sale of commodity futures, payable by the seller, EXCEPT exempted agricultural commodities. The exempt list in the annexure names both 'Guar Seed' and 'Jeera (Cumin Seed)', so neither contract pays CTT."
+source      = "NCDEX Member Compliance Guide - Imposition of Commodity Transaction Tax (March 31, 2024), citing Finance Act 2013 Chapter VII and CTT Rules 2013"
+source_url  = "https://ncdex.com/downloads/Membership/membercomplianceguide/8_Imposition%20of%20Commodity%20Transaction%20Tax_March%2031,%202024.pdf"
 
-[gst]
+[gst_on_brokerage_and_fees]
+status      = "confirmed"
+value       = 18.0
+unit        = "% on brokerage (stock broker services)"
+note        = "The source states 18% on stock brokers' services. Brokers also charge 18% GST on the exchange transaction fee and SEBI fee they pass through; that is market practice, not stated on this page."
+source      = "NSE 'SEBI Turnover Fees, STT and Other levies' page, GST table"
+source_url  = "https://www.nseindia.com/static/invest/first-time-investor-sebi-turnover-fees-stt-other-levies"
+
+[gst_on_warehousing]
 status      = "to_verify"
-note        = "18% on brokerage and exchange fees. Storage of agricultural produce may be exempt, and GST on the goods themselves applies at delivery (futures are quoted excl. GST). Needs a proper check for each commodity."
+note        = "Entry 54(e) of Notification 12/2017-Central Tax (Rate) exempts storage or warehousing of 'agricultural produce'. Whether machine-cleaned jeera and guar seed count as agricultural produce under that definition is a legal reading we have not confirmed. If not exempt, storage charges carry 18% GST. Ask NCCL / the warehouse service provider how they invoice."
+source_url  = "https://cbic-gst.gov.in/"
+
+[gst_on_goods]
+status      = "to_verify"
+note        = "Futures are quoted exclusive of GST and GST on the commodity is charged at delivery. For a GST-registered arbitrageur it is input credit on the spot purchase against output tax on delivery, so a cash-flow item rather than a cost. Rates per commodity not checked."

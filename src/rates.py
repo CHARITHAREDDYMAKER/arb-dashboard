@@ -28,6 +28,11 @@ def fetch_fbil_tbill_curve(session: requests.Session, start: date, end: date) ->
     return curve[["date", "tenor", "yield_pct"]].sort_values(["date", "tenor"]).reset_index(drop=True)
 
 
+def fbil_91_day_series(curve: pd.DataFrame) -> pd.Series:
+    """The 91-day point of the FBIL curve as a date-indexed series (% p.a.)."""
+    return curve.loc[curve["tenor"] == FBIL_91_DAY_TENOR].set_index("date")["yield_pct"].sort_index()
+
+
 def fetch_rbi_latest_tbill(session: requests.Session) -> dict:
     """Latest 91-day T-bill auction cut-off yield, from the RBI home page 'Current Rates' box."""
     response = polite_get(session, RBI_HOME_URL, delay=2.0)

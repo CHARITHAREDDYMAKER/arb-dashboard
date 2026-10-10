@@ -3,6 +3,7 @@ pandas>=2.2
 pyarrow>=16.0
 requests>=2.32
 pypdf>=4.2          # reading NCDEX / NCCL fee circulars (PDF)
+matplotlib>=3.9     # static sanity-check charts in reports/
 
 # Dashboard (Phase 4)
 streamlit>=1.36

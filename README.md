@@ -6,7 +6,7 @@ NCDEX agri commodities over the last 12 months:
 | Commodity | Futures symbol | Spot / basis centre |
 |---|---|---|
 | Jeera (cumin), primary | `JEERAUNJHA` | Unjha |
-| Guar seed, secondary | `GUARSEED10` | Jodhpur |
+| Guar seed, secondary | `GUARSEED10` | Jodhpur (Bikaner is an additional delivery centre, at a discount) |
 
 **The trade.** Buy the commodity in the spot market, store it in an
 NCDEX-accredited warehouse, sell futures, and deliver at expiry. The return is
@@ -38,7 +38,7 @@ Endpoints, sample rows and known gaps are in
 
 ```
 config/     commodities.toml, carry_costs.toml (fees and charges, with source links)
-src/        data fetching and (later) the metrics engine
+src/        data pipeline and (later) the metrics engine
 app/        Streamlit dashboard (Phase 4)
 data/raw/   downloads as received (not committed)
 data/processed/   cleaned parquet files used by the dashboard
@@ -47,19 +47,34 @@ reports/    phase reports
 
 ## Setup
 
+Requires Python 3.11 or newer.
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python -m src.feasibility_check     # writes reports/phase1_data_check.md
+python -m src.pipeline              # first run: about 25 minutes (one polite request per trading day)
+python -m src.pipeline --update     # later runs: fetch only new dates, rebuild the tables
 ```
 
-Requires Python 3.11 or newer.
+## Data pipeline
+
+`python -m src.pipeline` downloads the NCDEX bhavcopy for every trading day since
+10 Oct 2025 (cached in `data/raw/bhavcopy/`, so reruns are fast), then builds:
+
+| File | One row per | Key columns |
+|---|---|---|
+| `data/processed/futures.parquet` | date x contract | settlement price, volume, open interest, spot, days to expiry, `contract_rank` (1 = near month), `zero_oi_flag` |
+| `data/processed/spot.parquet` | date x commodity | spot price at the basis centre |
+| `data/processed/tbill.parquet` | trading date | 91-day T-bill yield and where each value came from (`fbil`, `ffill`, `rbi_fill`) |
+
+Prices are in Rs/quintal; volume and open interest in MT. Each run also rewrites
+[reports/phase2_data_quality.md](reports/phase2_data_quality.md).
 
 ## Status
 
 - [x] Phase 1: setup and data feasibility check
-- [ ] Phase 2: data pipeline (12 months, both commodities)
+- [x] Phase 2: data pipeline (12 months, both commodities)
 - [ ] Phase 3: metrics engine
 - [ ] Phase 4: Streamlit dashboard
 - [ ] Phase 5: polish, insights, deployment
