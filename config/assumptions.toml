@@ -19,3 +19,18 @@ signal_threshold_pct   = 0.25   # mispricing vs fair value, % of spot, needed to
 [capacity]
 share_of_volume   = 0.10    # tradeable size = this share of average daily volume
 window_days       = 20      # trading days in the volume average
+
+[backtest]
+# Defaults for the Historical Backtest tab; every one is a control there.
+threshold_pct           = 12.0     # enter when the quoted annualised return (before funding) is at least this
+min_dte                 = 15       # ignore contracts with fewer days to expiry
+exit_days_before        = 5        # for the "exit before expiry" mode
+starting_capital_rs     = 20000000 # Rs 2 crore
+max_allocation_pct      = 25.0     # of starting capital, per trade
+max_positions           = 4
+margin_pct              = 15.0     # ASSUMPTION: futures margin as % of futures value; check the current NCCL margin file
+buffer_pct              = 2.0      # ASSUMPTION: spare cash held against margin calls, % of spot value
+volume_cap_pct          = 10.0     # lots capped at this share of the contract's 20-day average volume
+inventory_lots          = 30       # stock already owned, used only by reverse arb
+slippage_pct            = 0.0      # ASSUMPTION: % of price on each leg
+transport_rs_per_quintal = 0.0     # ASSUMPTION: mandi to warehouse

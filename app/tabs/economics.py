@@ -111,7 +111,7 @@ def render(view: View) -> None:
     left, right = st.columns(2)
     with left:
         components.chart(
-            return_figure(economics, "cc_carry_return_pct", SIGNAL_CASH_AND_CARRY, theme.CARRY, "Cash-and-carry return"),
+            return_figure(economics, "cc_carry_return_pct", SIGNAL_CASH_AND_CARRY, theme.CARRY, "Cash-and-carry return, before funding"),
             f"Cash-and-carry: does buying spot and selling futures beat the T-bill? {DAGGER}",
             f"Tradeable on {carry_days.sum()} of {len(economics)} days (shaded). On those days the median locked return was "
             f"{pct(economics.loc[carry_days, 'cc_carry_return_pct'].median())} a year against a T-bill near {pct(economics['tbill_pct'].mean())}. {clip_note}",
@@ -119,7 +119,7 @@ def render(view: View) -> None:
         )
     with right:
         components.chart(
-            return_figure(economics, "rev_return_ex_funding_pct", SIGNAL_REVERSE, theme.REVERSE, "Reverse-arb return, excl. avoided funding"),
+            return_figure(economics, "rev_return_ex_funding_pct", SIGNAL_REVERSE, theme.REVERSE, "Reverse-arb return, before funding (excl. interest saved)"),
             f"Reverse arb: what does a stock holder gain by selling spot and buying futures? {DAGGER}",
             f"Tradeable on {reverse_days.sum()} of {len(economics)} days (shaded). Median gain {pct(economics.loc[reverse_days, 'rev_return_pct'].median())} a year "
             f"including interest saved; {pct(economics.loc[reverse_days, 'rev_return_ex_funding_pct'].median())} excluding it, which is the line drawn here, "

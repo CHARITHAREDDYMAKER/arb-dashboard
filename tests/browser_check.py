@@ -151,6 +151,30 @@ def main() -> int:
         settle(page)
         record("Signal Finder: switching the ranking changes the table", table.screenshot() != shot_before and not has_error(page))
 
+        # Historical Backtest: strategy, threshold and exit mode each change the results
+        page.get_by_role("tab", name="Historical Backtest").click()
+        settle(page)
+
+        def backtest_cards() -> str:
+            return " | ".join(page.locator(".kpi:visible").all_inner_texts())
+
+        cards = backtest_cards()
+        record("Backtest tab shows results", "Trades executed".upper() in cards.upper() and not has_error(page))
+        page.get_by_role("radiogroup", name="Strategy").get_by_text("Reverse arb (inventory)").click()
+        settle(page)
+        reverse_cards = backtest_cards()
+        record("Backtest: switching strategy changes the results", reverse_cards != cards and not has_error(page))
+        page.get_by_label("Entry threshold (% a year, before funding)").click()
+        page.keyboard.type("20%")
+        page.keyboard.press("Enter")
+        settle(page)
+        strict_cards = backtest_cards()
+        record("Backtest: raising the threshold changes the results", strict_cards != reverse_cards and not has_error(page))
+        page.get_by_role("radiogroup", name="Exit").get_by_text("Close before expiry").click()
+        settle(page)
+        record("Backtest: changing the exit mode changes the results", backtest_cards() != strict_cards and not has_error(page))
+        record("Backtest: trade history can be downloaded", page.get_by_role("button", name="Download trade history (CSV)").count() == 1)
+
         # Theme toggle (a server-wide setting, so it is always switched back)
         background = "getComputedStyle(document.querySelector('.stApp')).backgroundColor"
         dark = page.evaluate(background)

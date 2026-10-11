@@ -24,9 +24,24 @@ Best dates (contracts with 15 or more days to expiry) †:
 
 The one to say out loud: **jeera, 28 Nov 2025: Rs 910 a quintal, 4.67% in 21 days.** Then add that the median tradeable day earned about 16% annualised, so the best day is the exception.
 
+Backtest headline numbers (default inputs: Rs 2 crore, 12% entry threshold, hold to delivery, 15% margin, 30 lots of inventory) †:
+
+| | Jeera | Guar seed |
+|---|---|---|
+| Cash-and-carry: independent opportunities / completed trades | 58 / 9 (3 more still open) | 54 / 8 (3 more still open) |
+| Peak capital in use | Rs 93.7 lakh of Rs 2 crore | Rs 97.7 lakh of Rs 2 crore |
+| Net profit after funding (before funding) | Rs 2.09 lakh (Rs 3.80 lakh) | Rs 3.97 lakh (Rs 6.39 lakh) |
+| Average quoted yield, before funding | 21.28% | 19.32% |
+| Actual annualised return on total capital, before funding (after) | 1.91% (1.05%) | 3.20% (1.99%) |
+| Return on capital while in use, before funding | 13.39% | 16.17% |
+| Capital utilisation / max drawdown | 14.25% / 1.01% | 19.81% / 1.40% |
+| Reverse arb on 30 lots of stock: trades, net profit, return before funding | 4, Rs 15.60 lakh, 6.95% | 8, Rs 10.62 lakh, 10.60% |
+
+The line to say: **"A signal quotes about 21%. The capital actually earned about 13% while it was deployed and under 2% on the whole pot, because it was idle 86% of the time."**
+
 ## Three-minute demo script
 
-Tab order in the app: Overview, Signal Finder, Cash vs Futures, Arb Economics, Term Structure, Convergence & Entry Timing, Rollover & Capacity, Method & Data. The demo uses five of them. Lead with the question, then the finding, then the evidence.
+Tab order in the app: Overview, Signal Finder, Historical Backtest, Cash vs Futures, Arb Economics, Term Structure, Convergence & Entry Timing, Rollover & Capacity, Method & Data. The demo uses five of them. Lead with the question, then the finding, then the evidence.
 
 **0:00 Overview (40 seconds)**
 - Say: "A cash-futures desk buys the commodity, stores it, sells futures and delivers. The question is whether the gap between futures and spot pays for the carry. I measured that for jeera and guar seed on NCDEX over a year, with real warehouse and exchange costs."
@@ -50,6 +65,8 @@ Tab order in the app: Overview, Signal Finder, Cash vs Futures, Arb Economics, T
 
 **2:45 Method & Data (15 seconds)**
 - "Spot matched the exchange's page exactly on the day I checked. Contracts settled within 0.07% of where the model says. Two cost inputs are assumptions and they are marked."
+
+If asked "what would this have earned?", open Historical Backtest: 9 jeera trades, Rs 2.09 lakh net, and the contrast card (quoted 21% against 1.9% on capital).
 
 If asked to change something live: raise handling to Rs 25, or switch GST off, and show the header and the tradeable-day counts move. If asked about size, open Rollover & Capacity: about Rs 3 crore a day in jeera and Rs 11 crore in guar seed.
 
@@ -97,6 +114,15 @@ Reverse-arb benefit has three parts: the basis (spot minus futures), the storage
 **What does the arrival season have to do with the best dates?**
 The dashboard counts how many of the top dates fell in each crop's typical arrival season. Those months are general market knowledge, not exchange data, and the count is an observation, not a cause. One year is one crop cycle.
 
+**The signals quote 20% plus. Why did the backtest earn under 2% on capital?**
+Three reasons, in order of size. First, the capital was in use only 14% of the time for jeera; opportunities last days or weeks and then the money sits idle. Second, a quoted yield is on the spot value, but each rupee of goods needs about Rs 1.18 of capital once margin, buffer and one-off costs are added. Third, most opportunities could not be traded: of 58 in jeera, 24 were repeat signals on a contract already traded and 22 were on contracts too thin to take one lot. While it was deployed the capital earned 13.4% a year before funding, about 8 points over the T-bill. The honest summary is a good return on deployed capital and a small one on committed capital.
+
+**How did you make sure the backtest does not cheat?**
+It walks forward one day at a time and each decision uses only that day's row and earlier ones. Funding is fixed at the T-bill known on the entry day. A unit test rewrites every price after a cut-off date and checks that the trades entered before it are identical. Consecutive signal days on one contract count as one opportunity and one trade, and capital is locked until exit, with tests for both. Futures prices are actual settlements, including the final settlement at expiry. What is modelled, and I say so on the tab, is buying physical goods at the polled spot price, the margin and the costs.
+
+**Every backtest trade made money. Is that believable?**
+For trades held to delivery, yes in the model and no in the world. The spread is locked at entry and the engine only enters when it exceeds the modelled costs, so a delivered trade cannot lose on price. That is the point of an arbitrage. The losses a real desk takes are outside the model: a lot failing assay, buying above the polled spot price, transport, a margin call that forces an early exit. The tab has slippage and transport inputs and an early-exit mode to show this: closing five days before expiry exposes the trade to the spread on that day, and it can lose.
+
 **How do you define basis?**
 Spot minus futures, the textbook convention. A negative basis means futures are above spot, which is the cash-and-carry side; a positive basis means futures are below spot, the reverse-arb side. Some desks quote it the other way round (futures minus spot), so I say the definition before quoting a number. In the dashboard the futures-minus-spot figure is called the futures premium; it is the same number with its sign flipped.
 
@@ -118,6 +144,7 @@ Three checks. It matched the NCDEX spot page exactly on 9 Oct 2026 for both comm
 - **Spot was cross-checked on one date only.**
 - **One year of data is one crop cycle.** The seasonality chart shows a pattern to test, not a rule.
 - **Arrival-season months are the typical arrival season (general market knowledge, not from exchange data).** They are reported next to the best dates as an observation, never as a cause.
+- **The backtest rests on assumptions:** 15% futures margin, a 2% cash buffer, zero slippage and transport, purchase at the polled spot price, and idle cash earning nothing. It covers one year and about a dozen trades.
 - **Best dates are the top of the distribution.** Quote the median (about 16% annualised for cash-and-carry) for what the strategy earns.
 - **Guar seed assaying** is charged per 10 MT sample lot. A single 5 MT lot pays the full charge, double the Rs 15 per quintal used here.
 - **The last five T-bill values are RBI auction yields**, used until FBIL publishes; they sit about 0.08 points above the FBIL series.

@@ -49,6 +49,7 @@ def trade_card(view: View, recent) -> dict:
         label, profit, holding, annual, column, colour = "Reverse arb", snap["rev_benefit"], snap["rev_benefit_pct"], snap["rev_return_pct"], "rev_benefit", theme.REVERSE
     else:
         label, profit, holding, annual, column, colour = "Cash-and-carry", snap["cc_net_profit"], snap["cc_net_profit_pct"], snap["cc_carry_return_pct"], "cc_net_profit", theme.CARRY
+    funding_label = "after funding" if reverse else "before funding"
     tbill = f"T-bill {pct(snap['tbill_pct'])}" + (" (RBI fill)" if snap["tbill_is_rbi_fill"] else "")
     days = snap["days_to_expiry"]
     spark = components.sparkline(recent[column], colour)
@@ -58,14 +59,14 @@ def trade_card(view: View, recent) -> dict:
             label=f"{label} net {DAGGER}",
             value=f"{rs(profit, signed=True)}",
             sub=f"per quintal · {pct(holding, signed=True)} over {days} days<br>"
-            f"<span class='greyed'>{pct(annual, signed=True)} annualised · {components.SHORT_DATED_NOTE}</span>",
+            f"<span class='greyed'>{pct(annual, signed=True)} annualised {funding_label} · {components.SHORT_DATED_NOTE}</span>",
             spark=spark,
         )
     # Beside the T-bill, reverse arb shows its return excluding avoided funding (see metrics.reverse_arb).
     against_tbill = f"{pct(snap['rev_return_ex_funding_pct'], signed=True)} excl. avoided funding vs {tbill}" if reverse else tbill
     return dict(
         label=f"{label} return {DAGGER}",
-        value=f"{pct(annual, signed=True)} <span class='unit'>a year</span>",
+        value=f"{pct(annual, signed=True)} <span class='unit'>a year, {funding_label}</span>",
         sub=f"{against_tbill} · net {rs(profit, signed=True)} per quintal over {days} days",
         spark=spark,
     )

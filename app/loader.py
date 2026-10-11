@@ -13,7 +13,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from src import metrics, settings
+from src import backtest, metrics, settings
 from src.metrics import SHORT_DATED_DAYS, CostInputs, Rules  # noqa: F401  (SHORT_DATED_DAYS is re-exported to the tabs)
 
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
@@ -162,3 +162,26 @@ def build_view(commodity: str, start: date, end: date, costs_by_commodity: dict[
         peers=peer_summary(costs_by_commodity, rules),
         gst_what_if=gst_what_if(commodity, costs, rules),
     )
+
+
+# --------------------------------------------------------------------------- #
+# Historical backtest
+# --------------------------------------------------------------------------- #
+
+
+def load_backtest_defaults() -> dict:
+    return load_config()[2]["backtest"]
+
+
+@st.cache_data(show_spinner=False)
+def compute_backtest(commodity: str, cost_values: tuple, rule_values: tuple, config_values: tuple) -> dict:
+    """Run the backtest engine on the full history of one commodity. All logic lives in src/backtest.py."""
+    costs, config = CostInputs(*cost_values), backtest.BacktestConfig(*config_values)
+    basis = compute_tables(commodity, cost_values, rule_values)["basis"]
+    days = backtest.prepare_contract_days(basis, load_tables()[2], costs, config)
+    result = backtest.run_backtest(days, costs, load_config()[0][commodity]["lot_size_mt"], config)
+    return {"trades": result.trades, "equity": result.equity, "opportunities": result.opportunities, "summary": result.summary}
+
+
+def run_backtest(view: View, config: backtest.BacktestConfig) -> dict:
+    return compute_backtest(view.commodity, astuple(view.costs), astuple(view.rules), astuple(config))

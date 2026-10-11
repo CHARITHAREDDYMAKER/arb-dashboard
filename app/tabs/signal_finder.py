@@ -46,12 +46,15 @@ def calculator_table(title: str, lines: list[tuple], result: str) -> str:
 def render_calculator(view: View, day: pd.Series) -> None:
     calc = metrics.trade_calculator(day["spot"], day["settlement_price"], day["days_to_expiry"], day["tbill_pct"], view.costs)
     summary, days = calc["summary"], int(day["days_to_expiry"])
+    lot_quintals = view.details["lot_size_mt"] * metrics.QUINTALS_PER_MT
     caution = f" <span class='greyed'>({components.SHORT_DATED_NOTE})</span>" if days < SHORT_DATED_DAYS else ""
 
     st.markdown(
         f'<p class="legend-note">{long_date(day["date"])} · contract <b>{day["contract_symbol"]}</b> · {days} days to expiry · '
         f'spot <b>{rs(day["spot"])}</b> · futures <b>{rs(day["settlement_price"])}</b> · fair value {rs(summary["fair_value"])} · '
-        f'91-day T-bill {pct(day["tbill_pct"])}. All amounts are Rs per quintal {DAGGER}.</p>',
+        f'91-day T-bill {pct(day["tbill_pct"])}. Implied carry <b>{pct(summary["implied_carry_pct"], signed=True)}</b> a year '
+        f'(ln(futures / spot) x 365 / {days}) against a cost of carry of <b>{pct(summary["cost_of_carry_pct"])}</b> (funding + storage). '
+        f"All amounts are Rs per quintal {DAGGER}.</p>",
         unsafe_allow_html=True,
     )
     left, right = st.columns(2)
@@ -60,10 +63,13 @@ def render_calculator(view: View, day: pd.Series) -> None:
             calculator_table(
                 "▲ Cash-and-carry: buy spot, store, sell futures",
                 calc["carry"],
-                f"Holding-period return = carry profit / spot = <b>{pct(summary['carry_holding_pct'], signed=True)}</b> over {days} days.<br>"
-                f"Annualised = that x 365 / {days} = <b>{pct(summary['carry_annualised_pct'], signed=True)}</b>{caution}, "
-                f"which is <b>{summary['carry_excess_over_tbill']:+.2f} points</b> against the T-bill. "
-                "Funding is kept out of the return so the T-bill comparison does not count interest twice.",
+                f"<b>Before funding:</b> holding-period return = carry profit / spot = <b>{pct(summary['carry_holding_pct'], signed=True)}</b> over {days} days; "
+                f"annualised = that x 365 / {days} = <b>{pct(summary['carry_annualised_pct'], signed=True)}</b>{caution}, "
+                f"<b>{summary['carry_excess_over_tbill']:+.2f} points</b> against the T-bill.<br>"
+                f"<b>After funding:</b> net profit / spot, annualised = <b>{pct(summary['carry_after_funding_annualised_pct'], signed=True)}</b>. "
+                "The before-funding figure is the one compared with the T-bill, so interest is not counted twice.<br>"
+                f"<b>Per lot</b> of {view.details['lot_size_mt']} MT: {rs(summary['carry_net_profit'], signed=True)} per quintal x {lot_quintals:.0f} quintals = "
+                f"<b>{rs(summary['carry_net_profit'] * lot_quintals, 0, signed=True)}</b> net after funding.",
             ),
             unsafe_allow_html=True,
         )
@@ -72,9 +78,11 @@ def render_calculator(view: View, day: pd.Series) -> None:
             calculator_table(
                 "▼ Reverse arb: stock holder sells spot, buys futures",
                 calc["reverse"],
-                f"Holding-period return = net benefit / spot = <b>{pct(summary['reverse_holding_pct'], signed=True)}</b> over {days} days.<br>"
-                f"Annualised = that x 365 / {days} = <b>{pct(summary['reverse_annualised_pct'], signed=True)}</b>{caution}. Needs stock already held.<br>"
-                f"Excluding avoided funding: <b>{pct(summary['reverse_ex_funding_annualised_pct'], signed=True)}</b> a year, "
+                f"<b>After funding</b> (including interest saved): holding-period return = net benefit / spot = <b>{pct(summary['reverse_holding_pct'], signed=True)}</b> over {days} days; "
+                f"annualised = that x 365 / {days} = <b>{pct(summary['reverse_annualised_pct'], signed=True)}</b>{caution}. Needs stock already held.<br>"
+                f"<b>Per lot</b> of {view.details['lot_size_mt']} MT: {rs(summary['reverse_benefit'], signed=True)} per quintal x {lot_quintals:.0f} quintals = "
+                f"<b>{rs(summary['reverse_benefit'] * lot_quintals, 0, signed=True)}</b>.<br>"
+                f"<b>Before funding</b> (excluding avoided funding): <b>{pct(summary['reverse_ex_funding_annualised_pct'], signed=True)}</b> a year, "
                 f"<b>{summary['reverse_excess_over_tbill']:+.2f} points</b> against the T-bill. The interest saved is itself earned at about the "
                 "T-bill rate, so it is left out of this comparison to avoid counting it twice.",
             ),
@@ -158,9 +166,9 @@ TABLE_COLUMNS = {
     "spot": st.column_config.NumberColumn("Spot", format="%.2f", width=80),
     "futures": st.column_config.NumberColumn("Futures", format="%.2f", width=80),
     "basis_pct": st.column_config.NumberColumn("Basis %", format="%.2f", width=70),
-    "net_rs": st.column_config.NumberColumn("Net Rs/qtl", format="%.2f", width=85),
-    "holding_pct": st.column_config.NumberColumn("Holding %", format="%.2f", width=80),
-    "annualised_pct": st.column_config.NumberColumn("Annualised %", format="%.2f", width=95),
+    "net_rs": st.column_config.NumberColumn("Net Rs/qtl (after funding)", format="%.2f", width=95),
+    "holding_pct": st.column_config.NumberColumn("Holding % (before funding)", format="%.2f", width=95),
+    "annualised_pct": st.column_config.NumberColumn("Annualised % (before funding)", format="%.2f", width=105),
     "excess_over_tbill": st.column_config.NumberColumn("Over T-bill, pts", format="%.2f", width=105),
     "final_settlement": st.column_config.NumberColumn("Settled at", format="%.2f", width=85),
     "convergence_error_pct": st.column_config.NumberColumn("Settled vs 3-day spot %", format="%.3f", width=150),
@@ -183,9 +191,11 @@ def table_columns(side: str) -> dict:
     """
     columns = dict(TABLE_COLUMNS)
     if side == SIGNAL_REVERSE:
-        columns["annualised_pct"] = st.column_config.NumberColumn("Annualised % (full)", format="%.2f", width=105)
-        columns["ex_funding_annualised_pct"] = st.column_config.NumberColumn("Annualised % excl. avoided funding", format="%.2f", width=120)
-        columns["excess_over_tbill"] = st.column_config.NumberColumn("Excl. funding vs T-bill, pts", format="%.2f", width=120)
+        columns["net_rs"] = st.column_config.NumberColumn("Net Rs/qtl (after funding)", format="%.2f", width=95)
+        columns["holding_pct"] = st.column_config.NumberColumn("Holding % (after funding)", format="%.2f", width=95)
+        columns["annualised_pct"] = st.column_config.NumberColumn("Annualised % (after funding)", format="%.2f", width=105)
+        columns["ex_funding_annualised_pct"] = st.column_config.NumberColumn("Annualised % (before funding)", format="%.2f", width=110)
+        columns["excess_over_tbill"] = st.column_config.NumberColumn("Before funding vs T-bill, pts", format="%.2f", width=120)
     return {key: columns[key] for key in COLUMN_ORDER if key in columns}
 
 

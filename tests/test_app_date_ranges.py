@@ -32,4 +32,4 @@ def test_app_draws_for_date_range(commodity: str, label: str):
     app.run()
     app.date_input[0].set_value(DATE_RANGES[label]).run()
     assert not app.exception, [error.value for error in app.exception]
-    assert len(app.tabs) == 8
+    assert len(app.tabs) == 9

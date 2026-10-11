@@ -13,6 +13,7 @@ CHART_HEIGHT = 250
 
 TAB_GUIDE = [
     ("Signal Finder", "both trades worked through for any date, and the best dates of the year for each side."),
+    ("Historical Backtest", "what trading the signals would have earned on real capital, trade by trade."),
     ("Cash vs Futures", "the basis (spot minus futures) each day, and whether today is unusual."),
     ("Arb Economics", "what each side earns after costs, where the costs go, and every tradeable day."),
     ("Term Structure", "the shape of the futures curve and how steeply it pays to carry stock."),

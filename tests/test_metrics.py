@@ -370,3 +370,24 @@ def test_rupee_ranking_uses_every_day_and_short_dated_ranking_only_short_ones():
     assert list(metrics.best_dates(days, "CASH_AND_CARRY", metrics.RANK_BY_RUPEES)["net_rs"]) == [300.0, 150.0, 100.0, 50.0]
     assert list(metrics.best_dates(days, "CASH_AND_CARRY", metrics.RANK_SHORT_DATED)["annualised_pct"]) == [90.0]
     assert list(metrics.best_dates(days, "REVERSE", metrics.RANK_BY_ANNUALISED)["net_rs"]) == [250.0]
+
+
+# ---- implied carry and funding labels --------------------------------------- #
+
+
+def test_implied_carry_is_log_of_futures_over_spot_annualised():
+    # ln(20,400 / 20,000) = 0.019803; x 365 / 73 = x 5; x 100 = 9.9013%
+    assert metrics.implied_carry(SPOT, FUTURES, DAYS) == pytest.approx(9.9013, abs=1e-4)
+    assert np.isnan(metrics.implied_carry(SPOT, FUTURES, 0))
+
+
+def test_cost_of_carry_is_funding_plus_storage_annualised():
+    # funding 240 + storage 60.298 = 300.298; / 20,000 = 1.50149%; x 5 = 7.50745%
+    assert metrics.cost_of_carry(SPOT, DAYS, TBILL, COSTS) == pytest.approx(7.50745)
+
+
+def test_before_and_after_funding_returns_differ_by_the_funding_rate():
+    result = metrics.cash_and_carry(SPOT, FUTURES, DAYS, TBILL, COSTS)
+    before, after = result["cc_carry_return_pct"], result["cc_return_after_funding_pct"]
+    assert before - after == pytest.approx(TBILL + COSTS.funding_spread_pct)  # 6 points
+    assert after == pytest.approx(result["cc_net_profit"] / SPOT * 100 * 5)

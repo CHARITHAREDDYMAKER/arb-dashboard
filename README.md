@@ -52,6 +52,7 @@ year. The header always shows the latest trading day.
 |---|---|
 | Overview | What does the desk do, and what are the three findings? |
 | Signal Finder | What does each trade earn on any date, and which dates were best for each side? |
+| Historical Backtest | Trading the signals with real capital limits: how many trades, how much capital, what net profit and what return? |
 | Cash vs Futures | How far do futures trade from spot (basis = spot minus futures), and is the latest basis unusual? |
 | Arb Economics | Does cash-and-carry beat the T-bill, what does reverse arb pay, and where do the costs go? |
 | Term Structure | What does the curve look like, and is the market paying to carry stock forward? |
@@ -116,7 +117,7 @@ Prices are in Rs per quintal; volume and open interest in MT.
 
 ```
 app/        Streamlit dashboard: app.py, sidebar, header, one module per tab in tabs/
-src/        data pipeline (ncdex, rates, build_tables, pipeline) and metrics engine (metrics, build_metrics)
+src/        data pipeline (ncdex, rates, build_tables, pipeline), metrics engine (metrics, build_metrics) and backtest engine (backtest)
 config/     commodities.toml, carry_costs.toml (published charges with sources), assumptions.toml (desk inputs and rules)
 tests/      unit tests, plus browser_check.py and take_screenshots.py (Playwright)
 data/       processed/ parquet files (committed), reference/ source documents, raw/ downloads (not committed)

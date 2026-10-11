@@ -28,6 +28,10 @@ def load_rules() -> Rules:
     )
 
 
+def load_backtest_defaults() -> dict:
+    return read_config("assumptions.toml")["backtest"]
+
+
 def has_cold_storage(commodity: str) -> bool:
     return "cold_storage_value" in read_config("carry_costs.toml")["warehouse_storage"][commodity]
 

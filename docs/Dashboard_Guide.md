@@ -81,6 +81,9 @@ The 3-day settlement rule (expiry day plus the two trading days before) is **inf
 | Return excluding avoided funding | Reverse-arb return with the interest saved left out. This is the reverse-arb figure compared with the T-bill, because the interest saved is itself earned at about the T-bill rate. |
 | Short-dated | Fewer than 15 days to expiry. Annualising exaggerates these, so the dashboard leads with rupees instead. |
 | Break-even storage | The warehouse rent at which cash-and-carry would make exactly zero. |
+| Implied carry | ln(futures / spot) x 365 / days to expiry x 100: the annual rate the futures price implies. Compared with the cost of carry (funding plus storage). |
+| Before funding / after funding | Before funding leaves interest out and is the return compared with the T-bill. After funding deducts interest at T-bill plus the spread (or, for reverse arb, includes the interest saved). |
+| Quoted yield | The annualised before-funding return a signal shows on the day. Not the same as the return earned on capital over a year. |
 | Calendar spread | Next-month futures minus near-month futures. |
 | Roll % | The next month's share of the two contracts' combined open interest. |
 | Capacity | 10% of the 20-day average daily volume: the size a desk could trade in a day. |
@@ -196,7 +199,8 @@ One line per tab, to guide a first-time viewer.
   - Reverse arb: start from the basis = spot - futures. Add the funding and storage avoided. Subtract exchange fee, SEBI fee, brokerage, GST on fees and stamp duty. That gives net benefit. Holding-period and annualised return are worked out the same way.
   - Reverse arb against the T-bill: the calculator also shows the return **excluding avoided funding** and compares that with the T-bill. The avoided funding is interest on the cash, earned at T-bill plus the spread. Comparing the full return with the T-bill would count that interest twice.
 - **What you can infer:** exactly where the money goes on any day. On 9 Oct 2026 jeera's basis was -Rs 204.00, a futures premium of Rs 204.00. That leaves Rs 122.11 before funding and Rs 77.75 after.
-- **Caveats:** closing prices; a real entry would be at intraday prices. Funding is kept out of the return (but inside net profit) so the T-bill comparison does not count interest twice.
+- **Also shown:** implied carry against the cost of carry, each return labelled before or after funding, and net profit per lot (Rs per quintal x quintals per lot).
+- **Caveats:** closing prices; a real entry would be at intraday prices. Funding is kept out of the before-funding return (but inside net profit) so the T-bill comparison does not count interest twice.
 - **Likely question:** "Why is stamp duty zero on cash-and-carry?" Stamp duty is charged to the buyer of a future. In cash-and-carry the futures are sold and then delivered against, so there is no purchase.
 
 #### Signal timeline
@@ -230,9 +234,134 @@ One line per tab, to guide a first-time viewer.
 
 Two buttons save all three rankings for each side as CSV.
 
-### 5.3 Cash vs Futures
+### 5.3 Historical Backtest
 
-![Cash vs Futures tab](../reports/screens/jeera_2_cash_vs_futures.png)
+![Historical Backtest tab](../reports/screens/jeera_2_historical_backtest.png)
+
+This tab answers one question: over the past year, on which dates was the arbitrage worth doing, how many separate trades could realistically have been made, how much capital they needed, what was left after every cost, and what that capital actually earned in a year. It always runs on the full history; the sidebar date range does not apply.
+
+#### How the backtest works
+
+- **Walks forward one day at a time.** Every decision uses only that day's data and earlier. There is no look-ahead; a test rewrites future prices and checks that past decisions do not change.
+- **Entry.** A contract qualifies on a day when its quoted annualised return (before funding) is at or above the threshold, it has 15 or more days to expiry, it traded that day and has open interest, and the trade is profitable after all costs.
+- **One opportunity, one trade.** Consecutive qualifying days on the same contract are one opportunity, not several trades. Only one position is held in a contract at a time, and each contract is traded at most once per side.
+- **Size.** Lots are limited by free capital, the maximum allocation per trade, and 10% of the contract's own 20-day average volume.
+- **Exit.** Either hold to expiry and deliver at the final settlement price, or close both legs a set number of days before expiry at that day's settlement and spot.
+- **Capital is locked** from entry to exit and cannot be reused while the trade is open.
+
+#### What is actual and what is modelled
+
+| Actual (from exchange data) | Modelled (assumptions) |
+|---|---|
+| Futures entry and exit prices: NCDEX daily settlement prices | Buying or selling physical goods at the polled spot price |
+| Final settlement price at expiry | Trading at the day's close |
+| Polled spot price | Every cost line, from the cost model |
+| Volume and open interest | Futures margin (15%), cash buffer (2%), slippage (0), transport (0) |
+
+#### Formulas
+
+| Item | Formula |
+|---|---|
+| Implied carry | ln(futures / spot) x 365 / days to expiry x 100 |
+| Cost of carry | (funding + storage to expiry) / spot x 365 / days x 100 |
+| Quoted yield (entry test) | cash-and-carry: (futures - spot - storage - assaying - handling - fees) / spot x 365 / days. Reverse arb: return excluding avoided funding. Both before funding. |
+| Capital per quintal, cash-and-carry | spot + assaying + handling + transport + margin % x futures + buffer % x spot |
+| Capital, reverse arb | inventory value released = spot x quantity. No cash is used. |
+| Gross P&L, delivered cash-and-carry | (entry futures - final settlement) + (final settlement - entry spot) = entry futures - entry spot |
+| Gross P&L, early exit | (entry futures - exit futures) + (exit spot - entry spot) |
+| Funding | capital used x (T-bill at entry + spread) x days held / 365 |
+| Storage | rate x days actually held |
+| Net P&L | gross - all costs (cash-and-carry); gross + storage saved + interest saved - transaction costs (reverse arb) |
+| Net profit per lot | Rs per quintal x quintals per lot (30 for jeera, 50 for guar seed) |
+| Realised annualised return, per trade | net P&L / capital used x 365 / days held |
+| Return on capital in use | total net profit / capital-days in use x 365 |
+| Return on total capital | total net profit / capital base, annualised over the period |
+| Capital utilisation | capital-days in use / (capital base x days in the period) |
+| Max drawdown | largest fall of daily mark-to-market equity from an earlier peak |
+
+Portfolio return is always worked out from rupees and capital. Daily annualised yields are never added or averaged to get it.
+
+#### Settings
+
+| Control | Default | Meaning |
+|---|---|---|
+| Strategy | Cash-and-carry | Cash-and-carry only, reverse arb on inventory only, or both |
+| Entry threshold | 12% a year | Presets 8, 12, 15, 20%, or a custom value |
+| Exit | Hold to expiry and deliver | Or close a chosen number of days before expiry |
+| Starting capital | Rs 200 lakh (Rs 2 crore) | Cash available for cash-and-carry |
+| Max allocation per trade | 25% | Of starting capital |
+| Max simultaneous positions | 4 | Across both sides |
+| Futures margin | 15% (assumption) | Cash set aside against the short futures |
+| Inventory held | 30 lots | Stock already owned; used only by reverse arb |
+| Slippage, transport | 0 (assumptions) | Per leg and per quintal |
+
+#### KPI row
+
+- **What it shows:** trading days, opportunity days, independent opportunities, trades executed (and how many are still open), wins and losses, total net profit, portfolio return a year, max drawdown, capital utilisation and total costs.
+- **Inputs:** the trade list and the daily equity table from the engine.
+- **Current reading (jeera, cash-and-carry, defaults) †:** 246 trading days; 124 opportunity days; 58 independent opportunities across 13 contracts; 9 completed trades with 3 more still open; 9 wins, 0 losses; net profit +Rs 2.09 lakh after funding (+Rs 3.80 lakh before); portfolio return 1.91% a year before funding and 1.05% after, on Rs 2 crore; max drawdown 1.01%; utilisation 14.25%; costs Rs 2.70 lakh of Rs 4.80 lakh gross.
+- **What you can infer:** the trade is real and repeatable but small. Nine trades in a year, with at most Rs 93.7 lakh of Rs 2 crore in use at once.
+- **Caveats:** every delivered trade wins, by construction: the spread is locked at entry and the engine only enters when it exceeds the costs. Real losses come from things outside the model: failed quality checks, delivery problems, buying above the polled spot price.
+- **Likely question:** "Only 9 trades from 58 opportunities?" 24 were repeat signals on a contract already traded, 22 were on contracts too thin to trade one lot at 10% of volume, and 3 trades are still open.
+
+#### Quoted yield against actual return
+
+- **What it shows:** two numbers side by side: the average quoted opportunity yield and the actual annualised return on capital, both before funding, with a sentence explaining the gap.
+- **How calculated:** quoted = the average of the quoted annualised yield over every qualifying contract-day. Actual = net profit before funding / capital base, annualised.
+- **Current reading (jeera) †:** quoted 21.28%, actual 1.91%. While it was in use, capital earned 13.39% a year before funding.
+- **What you can infer:** the headline yield of a signal is not what a desk earns. Capital was in use 14.25% of the time; each rupee of goods needed Rs 1.18 of capital; and most opportunities could not be traded.
+- **Caveats:** idle cash is assumed to earn nothing. In practice it would sit in T-bills, which would add about 5% on the idle part.
+- **Likely question:** "So what does the strategy really return?" About 13% a year on capital while it is deployed, before funding, against a T-bill near 5.3%. On the whole capital base it adds about 1.9 points, because the capital is idle most of the year.
+
+#### Charts
+
+| Chart | What it shows | What to read from it |
+|---|---|---|
+| Entries and exits on price | Spot and active futures, with a triangle at each entry and a cross at each exit | Trades cluster after futures run ahead of spot; average holding period 59 days |
+| Equity and capital in use | Daily mark-to-market equity above; cash deployed (and inventory released) below, on separate scales | Equity dips while a trade is open even though the delivered profit is locked; capital is idle for long stretches |
+| Cumulative realised P&L | A step line that rises each time a trade closes | Profit arrives in steps at expiries, not smoothly |
+| Monthly P&L | Net P&L by the month each trade closed | Which expiries paid |
+| Cost breakdown | Total of each cost line | For jeera, funding is the largest (Rs 1.71 lakh), then assaying (Rs 0.45 lakh) and storage (Rs 0.28 lakh) |
+
+#### Trade history
+
+- **What it shows:** one row per completed trade: entry and exit dates and prices, lots, days held, capital used, every cost line, gross and net P&L, the quoted yield at entry, and the realised annualised return before and after funding. A column states which prices are actual and which are assumed. Downloadable as CSV.
+- **Current reading:** the first jeera trade was 7 lots of JEERAUNJHA20NOV2025 entered on 13 Oct 2025 at a quoted 14.97%; it realised 12.72% a year before funding on the capital used, and 6.30% after.
+- **Caveats:** positions still open on the last day are not listed; their value is in the equity curve.
+
+#### Strategy comparison
+
+- **What it shows:** the same settings run three ways.
+
+| Strategy (jeera, defaults) † | Opportunities | Trades | Capital base | Net profit | Return a year before funding | After funding | Max drawdown |
+|---|---|---|---|---|---|---|---|
+| Cash-and-carry | 58 | 9 | Rs 2.00 crore cash | +Rs 2.09 lakh | 1.91% | 1.05% | 1.01% |
+| Reverse arb (inventory) | 10 | 4 | Rs 1.71 crore of stock | +Rs 15.60 lakh | 6.95% | 9.17% | 3.57% |
+| Combined | 68 | 10 | Rs 3.71 crore | +Rs 5.55 lakh | 1.62% | 1.50% | 0.64% |
+
+- **What you can infer:** for someone who already holds jeera, selling spot and buying futures when futures are cheap earned far more than cash-and-carry did for a cash investor.
+- **Caveats:** the bases differ: cash for cash-and-carry, the value of 30 lots of stock for reverse arb. Reverse arb's after-funding figure includes interest earned on the cash released. Combined earns less than reverse arb alone because only one position is allowed per contract, so a cash-and-carry held to expiry blocks a later reverse trade in that contract.
+- **Likely question:** "Why is reverse arb better?" It has no one-off assaying or handling cost, ties up no cash, and the futures discount was often large. But it is only open to someone who already owns the stock.
+
+#### Sensitivity grid
+
+- **What it shows:** entry threshold (8, 12, 15, 20%) against futures margin (10, 15, 25%): trades, net profit after funding, and annualised return on total capital before funding.
+- **Current reading (jeera, cash-and-carry) †:** at 15% margin, raising the threshold from 8% to 20% cuts trades from 10 to 7 and lifts net profit from Rs 1.37 lakh to Rs 3.52 lakh. Waiting for a wider spread paid more than trading early.
+- **Caveats:** twelve runs on one year; a higher threshold in a quieter year could mean no trades at all.
+
+#### Limitations of the backtest
+
+- One year of data, 9 to 13 trades per strategy: far too few to estimate a distribution.
+- Spot is the polled reference price. A desk's real purchase price, mandi fees and transport are not in the default run.
+- The 15% margin and 2% buffer are assumptions; margins change and rise near expiry.
+- Trades are entered at the close in whole lots, with no market impact beyond the 10% volume cap.
+- Idle cash earns nothing in the model.
+- Delivery is assumed to work: goods pass assay and are accepted. The 3-day average spot rule for final settlement is inferred from the data; the backtest uses the actual settlement price and does not rely on it.
+- Guar seed assaying uses Rs 15 per quintal; a single 5 MT lot would pay Rs 30.
+
+### 5.4 Cash vs Futures
+
+![Cash vs Futures tab](../reports/screens/jeera_3_cash_vs_futures.png)
 
 #### Spot, futures and basis chart
 
@@ -256,9 +385,9 @@ Two buttons save all three rankings for each side as CSV.
 
 Average, lowest, highest, latest against average, and the share of days futures were above spot.
 
-### 5.4 Arb Economics
+### 5.5 Arb Economics
 
-![Arb Economics tab](../reports/screens/jeera_3_arb_economics.png)
+![Arb Economics tab](../reports/screens/jeera_4_arb_economics.png)
 
 #### Cash-and-carry return against the T-bill †
 
@@ -318,9 +447,9 @@ Days each side was tradeable, its share of days, the median annualised return an
 - **Caveats:** assumes entry at the close and holding to expiry.
 - **Likely question:** "How many trades is that?" Not 106 trades. Days cluster into windows; a desk would enter once per window, in size limited by capacity.
 
-### 5.5 Term Structure
+### 5.6 Term Structure
 
-![Term Structure tab](../reports/screens/jeera_4_term_structure.png)
+![Term Structure tab](../reports/screens/jeera_5_term_structure.png)
 
 #### Futures curve on a chosen date
 
@@ -349,9 +478,9 @@ Days each side was tradeable, its share of days, the median annualised return an
 - **Caveats:** one year is one crop cycle. The chart shows when the slope changed, not why.
 - **Likely question:** "Is that seasonality?" It may be. The flattest month falls in the typical arrival season, but that is an observation from one cycle, and the arrival months are general market knowledge, not exchange data. I would need several years to call it seasonal.
 
-### 5.6 Convergence & Entry Timing
+### 5.7 Convergence & Entry Timing
 
-![Convergence tab](../reports/screens/jeera_5_convergence_entry_timing.png)
+![Convergence tab](../reports/screens/jeera_6_convergence_entry_timing.png)
 
 #### Basis by days to expiry
 
@@ -384,9 +513,9 @@ The same chart as Finding 1 on the Overview, for the selected date range. Its ta
 - **Caveats:** the rule is inferred, not read from the specification.
 - **Likely question:** "What risk is left if you hold to expiry?" Price risk is close to nil. What remains is quality, delivery logistics and the 3-day averaging window.
 
-### 5.7 Rollover & Capacity
+### 5.8 Rollover & Capacity
 
-![Rollover tab](../reports/screens/jeera_6_rollover_capacity.png)
+![Rollover tab](../reports/screens/jeera_7_rollover_capacity.png)
 
 #### Calendar spread in rupees
 
@@ -423,9 +552,9 @@ The same chart as Finding 1 on the Overview, for the selected date range. Its ta
 - **Caveats:** a rule of thumb for futures only; the spot market's depth is not measured.
 - **Likely question:** "What caps the strategy?" Liquidity, not return.
 
-### 5.8 Method & Data
+### 5.9 Method & Data
 
-![Method tab](../reports/screens/jeera_7_method_data.png)
+![Method tab](../reports/screens/jeera_8_method_data.png)
 
 | Block | What it shows |
 |---|---|

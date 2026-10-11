@@ -77,7 +77,7 @@ Run this the evening before, once NCDEX has published the day's bhavcopy, and ag
 pip install -r requirements-dev.txt     # first time only
 python -m src.pipeline --update         # fetch new trading days, rebuild the tables
 python -m src.build_metrics             # rebuild the metric tables and the Phase 3 report
-python -m pytest                        # 43 tests should pass (takes about a minute)
+python -m pytest                        # all tests should pass (takes a minute or two)
 git add -A
 git commit -m "Refresh data"
 git push

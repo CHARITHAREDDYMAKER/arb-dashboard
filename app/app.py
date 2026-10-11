@@ -15,12 +15,13 @@ import header
 import loader
 import sidebar
 import theme
-from tabs import cash_futures, convergence, economics, method, overview, rollover, signal_finder, term_structure
+from tabs import backtest, cash_futures, convergence, economics, method, overview, rollover, signal_finder, term_structure
 
 # Tab label -> (icon, module). Labels are what the tests and the guide refer to.
 TABS = {
     "Overview": (":material/dashboard:", overview),
     "Signal Finder": (":material/target:", signal_finder),
+    "Historical Backtest": (":material/history:", backtest),
     "Cash vs Futures": (":material/show_chart:", cash_futures),
     "Arb Economics": (":material/payments:", economics),
     "Term Structure": (":material/stacked_line_chart:", term_structure),

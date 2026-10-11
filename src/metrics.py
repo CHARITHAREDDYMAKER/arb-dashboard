@@ -187,6 +187,7 @@ def cash_and_carry(spot, futures_price, days, tbill_pct, costs: CostInputs) -> d
         "cc_holding_return_pct": (gross - non_funding_costs) / spot * 100,  # before funding, not annualised
         "cc_net_profit": net_profit,
         "cc_net_profit_pct": net_profit / spot * 100,
+        "cc_return_after_funding_pct": annualise(net_profit / spot * 100, days),  # annualised, AFTER funding
         "cc_carry_return_pct": carry_return,
         "cc_excess_over_tbill": carry_return - tbill_pct,
         "break_even_storage": (net_profit + storage) / paid_days,
@@ -240,6 +241,22 @@ def reverse_arb(spot, futures_price, days, tbill_pct, costs: CostInputs) -> dict
 def fair_value(spot, days, tbill_pct, costs: CostInputs):
     """Cost-of-carry fair price of the future: spot plus funding and storage to expiry."""
     return spot + funding_cost(spot, tbill_pct, days, costs) + storage_cost(days, costs)
+
+
+def implied_carry(spot, futures_price, days):
+    """The annual rate the futures price implies for carrying the goods to expiry.
+
+    implied carry = ln(futures / spot) x 365 / days x 100. Compare it with the
+    cost of carry (funding plus storage): above it, futures are rich; below it, cheap.
+    """
+    days = np.where(np.asarray(days) > 0, days, np.nan)
+    return np.log(np.asarray(futures_price, dtype=float) / np.asarray(spot, dtype=float)) * DAYS_IN_YEAR / days * 100
+
+
+def cost_of_carry(spot, days, tbill_pct, costs: CostInputs):
+    """Funding plus storage to expiry as an annual % of spot: the rate fair value is built from."""
+    carry = funding_cost(spot, tbill_pct, days, costs) + storage_cost(days, costs)
+    return annualise(carry / spot * 100, days)
 
 
 def classify_signal(mispricing_pct, threshold_pct: float):
@@ -300,6 +317,8 @@ def daily_economics(basis: pd.DataFrame, tbill: pd.DataFrame, costs: CostInputs,
 
     active = active.assign(**cash_and_carry(spot, price, days, rate, costs), **reverse_arb(spot, price, days, rate, costs))
     active["fair_value"] = fair_value(spot, days, rate, costs)
+    active["implied_carry_pct"] = implied_carry(spot, price, days)
+    active["cost_of_carry_pct"] = cost_of_carry(spot, days, rate, costs)
     active["mispricing"] = price - active["fair_value"]
     active["mispricing_pct"] = active["mispricing"] / spot * 100
     active["signal"] = classify_signal(active["mispricing_pct"], rules.signal_threshold_pct)
@@ -629,6 +648,9 @@ def trade_calculator(spot, futures_price, days, tbill_pct, costs: CostInputs) ->
             "carry_annualised_pct": carry["cc_carry_return_pct"],
             "carry_excess_over_tbill": carry["cc_excess_over_tbill"],
             "carry_net_profit": carry["cc_net_profit"],
+            "carry_after_funding_annualised_pct": carry["cc_return_after_funding_pct"],
+            "implied_carry_pct": implied_carry(spot, futures_price, days),
+            "cost_of_carry_pct": cost_of_carry(spot, days, tbill_pct, costs),
             "reverse_benefit": reverse["rev_benefit"],
             "reverse_holding_pct": reverse["rev_benefit_pct"],
             "reverse_annualised_pct": reverse["rev_return_pct"],
@@ -819,6 +841,9 @@ def snapshot(name: str, economics: pd.DataFrame, liquidity_table: pd.DataFrame) 
         "rev_benefit": latest["rev_benefit"],
         "cc_net_profit": latest["cc_net_profit"],
         "cc_net_profit_pct": latest["cc_net_profit_pct"],
+        "cc_return_after_funding_pct": latest["cc_return_after_funding_pct"],
+        "implied_carry_pct": latest["implied_carry_pct"],
+        "cost_of_carry_pct": latest["cost_of_carry_pct"],
         "rev_benefit_pct": latest["rev_benefit_pct"],
         "expiry": latest["expiry"],
         "cc_carry_return_pct": latest["cc_carry_return_pct"],

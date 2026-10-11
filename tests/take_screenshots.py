@@ -22,7 +22,7 @@ URL = "http://localhost:8765"
 OUT_DIR = Path(__file__).resolve().parents[1] / "reports" / "screens"
 COMMODITIES = ["JEERA", "GUARSEED"]
 TAB_NAMES = [
-    "Overview", "Signal Finder", "Cash vs Futures", "Arb Economics", "Term Structure",
+    "Overview", "Signal Finder", "Historical Backtest", "Cash vs Futures", "Arb Economics", "Term Structure",
     "Convergence & Entry Timing", "Rollover & Capacity", "Method & Data",
 ]  # fmt: skip
 WIDTH, HEIGHT = 1366, 768  # a common laptop screen
