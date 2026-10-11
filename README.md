@@ -12,7 +12,7 @@ year, after real warehouse, exchange and funding costs.
 
 Buy the commodity in the spot market, store it in an NCDEX-accredited
 warehouse, sell futures against it and deliver at expiry. The return is the
-basis (futures minus spot) less the cost of carrying the goods, and it is worth
+futures premium (futures minus spot) less the cost of carrying the goods, and it is worth
 doing when it beats the 91-day T-bill. When futures trade below fair value the
 trade runs in reverse, for someone who already holds stock.
 
@@ -23,7 +23,7 @@ trade runs in reverse, for someone who already holds stock.
 
 ## What it found (10 Oct 2025 to 9 Oct 2026)
 
-1. **The carry is earned early, not near expiry.** Both futures curves slope up about 1.4% a month, but a contract loses its premium as delivery approaches: jeera averages +2.0% over spot 46 to 60 days out and -0.5% at 6 to 10 days.
+1. **The carry is earned early, not near expiry.** Both futures curves slope up about 1.4% a month, but a contract loses its premium as delivery approaches: jeera futures average 2.0% above spot 46 to 60 days out and 0.5% below it at 6 to 10 days.
 2. **Guar seed is a reverse-arb market; jeera is two-sided.** Guar seed paid stock holders on 64% of days and cash-and-carry on 14%. Jeera split 44% and 43%.
 3. **The model is tight; size is the limit.** Contracts settled within 0.07% of the 3-day average spot, but only about Rs 3 crore (jeera) and Rs 11 crore (guar seed) a day is tradeable at 10% of volume.
 
@@ -52,7 +52,7 @@ year. The header always shows the latest trading day.
 |---|---|
 | Overview | What does the desk do, and what are the three findings? |
 | Signal Finder | What does each trade earn on any date, and which dates were best for each side? |
-| Cash vs Futures | How far do futures trade from spot, and is the latest basis unusual? |
+| Cash vs Futures | How far do futures trade from spot (basis = spot minus futures), and is the latest basis unusual? |
 | Arb Economics | Does cash-and-carry beat the T-bill, what does reverse arb pay, and where do the costs go? |
 | Term Structure | What does the curve look like, and is the market paying to carry stock forward? |
 | Convergence & Entry Timing | Does a contract keep its premium into delivery, and when should the trade be entered? |
@@ -81,6 +81,10 @@ credentials are needed to reproduce it.
 The data belongs to its publishers and is reproduced here for analysis only.
 This project is not affiliated with NCDEX, NCCL, FBIL or RBI, and nothing in it
 is investment advice.
+
+**Basis convention.** Basis is spot minus futures. It is negative when futures
+are above spot (the cash-and-carry side) and positive when they are below (the
+reverse-arb side). Futures minus spot is called the futures premium.
 
 **Is the spot price right?** Spot is the bhavcopy's `UndrlygPric`, the last
 polled spot of the day at the basis centre. It matched the NCDEX spot price page

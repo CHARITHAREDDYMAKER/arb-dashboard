@@ -36,9 +36,9 @@ def as_dates(frame: pd.DataFrame, *columns: str) -> pd.DataFrame:
 
 
 def near_month(futures: pd.DataFrame) -> pd.DataFrame:
-    """The near-month contract on each date, with its basis against spot."""
+    """The near-month contract on each date, with its basis (spot - futures)."""
     near = futures[futures["contract_rank"] == 1].copy()
-    near["basis"] = near["settlement_price"] - near["spot"]
+    near["basis"] = near["spot"] - near["settlement_price"]
     near["basis_pct"] = near["basis"] / near["spot"] * 100
     return near
 
@@ -226,8 +226,8 @@ def quick_stats_section(futures: pd.DataFrame) -> list[str]:
                 "basis_pct_min": round(group["basis_pct"].min(), 2),
                 "basis_pct_mean": round(group["basis_pct"].mean(), 2),
                 "basis_pct_max": round(group["basis_pct"].max(), 2),
-                "days_futures_above_spot_pct": round((group["basis"] > 0).mean() * 100, 1),
-                "days_futures_below_spot_pct": round((group["basis"] < 0).mean() * 100, 1),
+                "days_futures_above_spot_pct": round((group["basis"] < 0).mean() * 100, 1),
+                "days_futures_below_spot_pct": round((group["basis"] > 0).mean() * 100, 1),
                 "current_basis": round(latest["basis"], 2),
                 "current_basis_pct": round(latest["basis_pct"], 2),
                 "as_of": latest["date"].date(),
@@ -236,8 +236,8 @@ def quick_stats_section(futures: pd.DataFrame) -> list[str]:
     return [
         "## 6. Quick stats (near-month contract)",
         "",
-        "Basis = near-month settlement price minus spot, in Rs/quintal and as % of spot. "
-        "Futures above spot is the contango (cash-and-carry) side; below spot is backwardation (reverse arb).",
+        "Basis = spot minus near-month settlement price, in Rs/quintal and as % of spot. "
+        "Negative basis (futures above spot) is the cash-and-carry side; positive basis (futures below spot) is the reverse-arb side.",
         "",
         to_markdown(pd.DataFrame(rows)),
         "",

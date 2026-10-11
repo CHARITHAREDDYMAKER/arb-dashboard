@@ -110,9 +110,9 @@ def render(view: View) -> None:
                 spark=components.sparkline(recent["settlement_price"], theme.FUTURES),
             ),
             dict(
-                label="Basis",
+                label="Basis (spot - futures)",
                 value=rs(snap["basis"], signed=True),
-                sub=f"{pct(snap['basis_pct'], signed=True)} of spot"
+                sub=f"{pct(snap['basis_pct'], signed=True)} of spot · futures {'above' if snap['basis'] < 0 else 'below'} spot"
                 + (f" · {components.delta(basis_change, rs(basis_change, 0, signed=True))}" if same_contract else ""),
                 spark=components.sparkline(recent["basis_pct"], theme.FUTURES),
             ),

@@ -126,7 +126,7 @@ def timeline_figure(economics: pd.DataFrame, days: pd.DataFrame, chosen: pd.Time
         )  # fmt: skip
         best = metrics.best_dates(days, side, metrics.RANK_BY_ANNUALISED, top=TOP_ANNOTATED)
         for position, row in enumerate(best.itertuples()):
-            above = side == SIGNAL_CASH_AND_CARRY
+            above = side == SIGNAL_REVERSE  # reverse-arb days have a positive basis, so their labels go above
             figure.add_annotation(
                 x=row.date, y=row.basis_pct, text=f"{row.date:%d %b}<br>{row.annualised_pct:.0f}%", showarrow=True, arrowhead=0, arrowwidth=1,
                 arrowcolor=theme.MUTED, ax=0, ay=(-34 - 14 * (position % 2)) if above else (34 + 14 * (position % 2)),
@@ -134,7 +134,7 @@ def timeline_figure(economics: pd.DataFrame, days: pd.DataFrame, chosen: pd.Time
             )  # fmt: skip
     figure.add_vline(x=chosen, line_width=1.5, line_dash="dash", line_color=theme.ACCENT)
     figure.add_hline(y=0, line_width=1, line_color=theme.FAINT)
-    figure.update_layout(yaxis=dict(title="Basis, % of spot", ticksuffix="%"), hovermode="closest", legend=dict(font=dict(size=11)))
+    figure.update_layout(yaxis=dict(title="Basis (spot - futures), % of spot", ticksuffix="%"), hovermode="closest", legend=dict(font=dict(size=11)))
     return figure
 
 
@@ -257,7 +257,7 @@ def render(view: View) -> None:
     components.chart(
         timeline_figure(economics, days, chosen),
         f"When was each side tradeable, and how good was it? {DAGGER}",
-        f"Each marker is a trading day on the basis line: {carry_days} cash-and-carry days (▲), {reverse_days} reverse-arb days (▼), "
+        f"Each marker is a trading day on the basis line (spot minus futures; below zero means futures above spot): {carry_days} cash-and-carry days (▲), {reverse_days} reverse-arb days (▼), "
         f"{len(economics) - carry_days - reverse_days} with no trade (■). Bigger markers earned more a year (capped at 90%). "
         f"Labels mark the top {TOP_ANNOTATED} dates of each side with {SHORT_DATED_DAYS}+ days to expiry. Click a marker to load that day into the calculator.",
         key=TIMELINE_KEY, height=420, on_select="rerun", selection_mode="points",

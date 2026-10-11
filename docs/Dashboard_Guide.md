@@ -65,7 +65,8 @@ The 3-day settlement rule (expiry day plus the two trading days before) is **inf
 |---|---|
 | Spot | The price of the physical commodity today at the basis centre. |
 | Futures | The price agreed today for delivery at a contract's expiry. |
-| Basis | Futures minus spot. In Rs per quintal, or as a % of spot. |
+| Basis | Spot minus futures, in Rs per quintal or as a % of spot. Negative when futures are above spot (the cash-and-carry side); positive when futures are below spot (the reverse-arb side). |
+| Futures premium | Futures minus spot: the basis with its sign flipped. It is the gross gain of a cash-and-carry. |
 | Contango | Later-dated futures cost more than nearer ones. The curve slopes up. |
 | Backwardation | Later-dated futures cost less. The curve slopes down; nearby supply is tight. |
 | DTE | Days to expiry: calendar days from today to the contract's expiry date. |
@@ -121,7 +122,7 @@ Each card has a small line showing the last 30 trading days and, where it makes 
 |---|---|---|---|
 | Spot | Spot price at the basis centre | `UndrlygPric` | Rs 24,626.00, up 0.34% |
 | Active futures | Settlement price of the active contract, its expiry and DTE | Settlement price | Rs 24,830.00, expires 19 Oct 2026, 10 days |
-| Basis | Futures minus spot, in Rs and % | futures - spot | +Rs 204.00, +0.83% |
+| Basis (spot - futures) | Spot minus futures, in Rs and %, and whether futures are above or below spot | spot - futures | -Rs 204.00, -0.83%; futures above spot |
 | Signal † | The tradeable signal as a coloured pill | See glossary | Cash-and-carry; futures 0.61% above fair value |
 | Trade card † | Net result of the tradeable side | Short-dated: Rs per quintal and holding-period return lead. Otherwise the annualised return leads. | +Rs 77.75 per quintal, +0.32% over 10 days (18.10% annualised, greyed) |
 | Break-even rent † | Storage rate at which cash-and-carry makes zero | (gross - all other costs) / days | Rs 7.29 per quintal per day, against an actual Rs 0.70 |
@@ -153,10 +154,10 @@ Each card has a small line showing the last 30 trading days and, where it makes 
 
 #### Finding 1: the carry is earned early, not near expiry
 
-- **What it shows:** average basis % by days-to-expiry bucket, from 46-60 days out down to 0-5 days.
+- **What it shows:** average basis % (spot minus futures) by days-to-expiry bucket, from 46-60 days out down to 0-5 days. Bars below zero mean futures above spot.
 - **Inputs:** `basis_pct` and `days_to_expiry` for every contract on days it had open interest; full history.
 - **How calculated:** group contract-days into six buckets and average the basis %.
-- **What you can infer:** a contract loses its premium as delivery nears. Jeera: +2.03% at 46-60 days, -0.53% at 6-10 days, while the curve slopes up 1.39% a month. Enter cash-and-carry early.
+- **What you can infer:** a contract loses its premium as delivery nears. Jeera's basis averages -2.03% at 46-60 days (futures 2.03% above spot) and +0.53% at 6-10 days (futures below spot), while the curve slopes up 1.39% a month. Enter cash-and-carry early.
 - **Caveats:** an average across 11 to 13 contracts in one year; single contracts scatter by a few percent.
 - **Likely question:** "Why would futures trade below spot just before delivery?" Sellers who do not want to deliver close out, the settlement uses a 3-day average that lags a moving spot, and delivered quality may be worth less than the polled spot grade.
 
@@ -191,16 +192,16 @@ One line per tab, to guide a first-time viewer.
 - **What it shows:** for a chosen date, both trades line by line in Rs per quintal, with the formula beside each amount, then holding-period return, annualised return and the gap to the T-bill. A line underneath says which side was tradeable.
 - **Inputs:** spot, active futures, days to expiry and T-bill on that date; storage and assaying rates; every desk input.
 - **How calculated:**
-  - Cash-and-carry: gross = futures - spot. Subtract storage (rate x days), assaying, handling, exchange fee, SEBI fee, brokerage, GST on fees. That gives carry profit before funding. Holding-period return = carry profit / spot. Annualised = that x 365 / days. Then subtract funding (spot x (T-bill + spread) x days / 365) to get net profit.
-  - Reverse arb: price gap = spot - futures. Add the funding and storage avoided. Subtract exchange fee, SEBI fee, brokerage, GST on fees and stamp duty. That gives net benefit. Holding-period and annualised return are worked out the same way.
+  - Cash-and-carry: gross = futures premium = futures - spot (the basis with its sign flipped). Subtract storage (rate x days), assaying, handling, exchange fee, SEBI fee, brokerage, GST on fees. That gives carry profit before funding. Holding-period return = carry profit / spot. Annualised = that x 365 / days. Then subtract funding (spot x (T-bill + spread) x days / 365) to get net profit.
+  - Reverse arb: start from the basis = spot - futures. Add the funding and storage avoided. Subtract exchange fee, SEBI fee, brokerage, GST on fees and stamp duty. That gives net benefit. Holding-period and annualised return are worked out the same way.
   - Reverse arb against the T-bill: the calculator also shows the return **excluding avoided funding** and compares that with the T-bill. The avoided funding is interest on the cash, earned at T-bill plus the spread. Comparing the full return with the T-bill would count that interest twice.
-- **What you can infer:** exactly where the money goes on any day. On 9 Oct 2026 jeera's Rs 204.00 basis leaves Rs 122.11 before funding and Rs 77.75 after.
+- **What you can infer:** exactly where the money goes on any day. On 9 Oct 2026 jeera's basis was -Rs 204.00, a futures premium of Rs 204.00. That leaves Rs 122.11 before funding and Rs 77.75 after.
 - **Caveats:** closing prices; a real entry would be at intraday prices. Funding is kept out of the return (but inside net profit) so the T-bill comparison does not count interest twice.
 - **Likely question:** "Why is stamp duty zero on cash-and-carry?" Stamp duty is charged to the buyer of a future. In cash-and-carry the futures are sold and then delivered against, so there is no purchase.
 
 #### Signal timeline
 
-- **What it shows:** one chart for the period. Each trading day is a marker on the basis line: teal up-triangle for cash-and-carry, orange down-triangle for reverse arb, grey square for no trade. Bigger markers earned more a year. The top 5 dates of each side are labelled with date and return. A dashed line marks the date in the calculator.
+- **What it shows:** one chart for the period. Each trading day is a marker on the basis line (spot minus futures, so cash-and-carry days sit below zero and reverse-arb days above): teal up-triangle for cash-and-carry, orange down-triangle for reverse arb, grey square for no trade. Bigger markers earned more a year. The top 5 dates of each side are labelled with date and return. A dashed line marks the date in the calculator.
 - **Inputs:** `basis_pct`, `tradeable_signal` and the annualised return of the tradeable side.
 - **How calculated:** marker size scales with annualised return, capped at 90% so short-dated spikes do not dominate. Labels use only days with 15 or more days to expiry.
 - **What you can infer:** signals come in clusters, not randomly. Jeera had 106 cash-and-carry days in 34 windows and 108 reverse days in 25 windows. Clicking a marker loads that day into the calculator.
@@ -237,8 +238,8 @@ Two buttons save all three rankings for each side as CSV.
 
 - **What it shows:** spot and the active futures on top; basis in Rs (bars) and basis in % (line) below, on one time axis. Dotted lines mark expiries; diamonds mark rolls. Two tick boxes add the next and far months.
 - **Inputs:** `spot`, `settlement_price`, `basis`, `basis_pct`; the roll threshold; open interest for the optional lines.
-- **How calculated:** basis = futures - spot; basis % = basis / spot x 100.
-- **What you can infer:** futures closed above spot on 61% of days for jeera; the basis ranged from -3.70% to +6.86% and averaged +0.45%.
+- **How calculated:** basis = spot - futures; basis % = basis / spot x 100. Negative means futures above spot.
+- **What you can infer:** futures closed above spot on 61% of days for jeera; the basis ranged from -6.86% to +3.70% and averaged -0.45%.
 - **Caveats:** the futures line changes contract at each diamond, so a jump there is a roll, not a price move.
 - **Likely question:** "Why three panels and not two axes on one chart?" Two y-axes on one chart invite misreading; separate panels keep each scale honest.
 
@@ -247,9 +248,9 @@ Two buttons save all three rankings for each side as CSV.
 - **What it shows:** a histogram of daily basis % with the latest value marked.
 - **Inputs:** `basis_pct` for the period shown.
 - **How calculated:** counts of days per basis bucket; percentile of the latest value.
-- **What you can infer:** the latest jeera basis, +0.83%, is higher than on 59% of days. Half of all days fell between -0.51% and +1.40%. It is ordinary, not extreme.
+- **What you can infer:** the latest jeera basis, -0.83%, is higher than on 41% of days. Half of all days fell between -1.40% and +0.51%. It is ordinary, not extreme. Left of zero, futures are above spot; right of zero, below.
 - **Caveats:** mixes days with very different days to expiry; basis naturally shrinks near expiry.
-- **Likely question:** "Is a 0.83% basis attractive?" On its own, no. It has to be compared with the cost of carry for the days left, which is what the next tab does.
+- **Likely question:** "Is a basis of -0.83% attractive?" On its own, no. It has to be compared with the cost of carry for the days left, which is what the next tab does.
 
 #### Stat cards
 
@@ -279,10 +280,10 @@ Average, lowest, highest, latest against average, and the share of days futures 
 
 #### Cost waterfall †
 
-- **What it shows:** the latest day's cash-and-carry per quintal: gross basis, then each cost, then net profit.
+- **What it shows:** the latest day's cash-and-carry per quintal: the futures premium (futures minus spot), then each cost, then net profit.
 - **Inputs:** the latest day's row; all cost inputs.
 - **How calculated:** each bar is one line of the cost model; storage and assaying are shown before GST, with all GST in its own bar.
-- **What you can infer:** on 9 Oct 2026 jeera's +Rs 204.00 gross loses Rs 126.25 to costs. Assaying (Rs 50.00 before GST) is the largest, then funding (Rs 44.36). Net +Rs 77.75 per quintal, or +Rs 2,332 per 3 MT lot.
+- **What you can infer:** on 9 Oct 2026 jeera's +Rs 204.00 futures premium loses Rs 126.25 to costs. Assaying (Rs 50.00 before GST) is the largest, then funding (Rs 44.36). Net +Rs 77.75 per quintal, or +Rs 2,332 per 3 MT lot.
 - **Caveats:** one day only. On a longer-dated trade funding and storage would be larger and assaying relatively smaller.
 - **Likely question:** "What is the biggest cost?" For a short trade, the one-off assaying charge. For a long one, funding.
 
@@ -290,10 +291,10 @@ Average, lowest, highest, latest against average, and the share of days futures 
 
 - **What it shows:** the storage rate at which cash-and-carry would make zero, over time, against the actual NCCL rate.
 - **Inputs:** `break_even_storage`, the NCCL storage rate.
-- **How calculated:** (gross basis - all costs other than storage) / (days x GST multiplier).
+- **How calculated:** (futures premium - all costs other than storage) / (days x GST multiplier).
 - **What you can infer:** jeera's break-even was above the actual Rs 0.70 on 43% of days. On 9 Oct 2026 it was Rs 7.29: storage could be ten times dearer and the trade would still pay.
 - **Caveats:** axis clipped at -15 and 25. Below zero means futures do not even cover funding and one-off costs.
-- **Likely question:** "How sensitive is the trade to warehouse rent?" Hardly at all. Rent is Rs 0.70 a day on a Rs 24,600 commodity. The basis and the one-off costs decide the trade.
+- **Likely question:** "How sensitive is the trade to warehouse rent?" Hardly at all. Rent is Rs 0.70 a day on a Rs 24,600 commodity. The futures premium and the one-off costs decide the trade.
 
 #### Side summary cards †
 
@@ -354,14 +355,14 @@ Days each side was tradeable, its share of days, the median annualised return an
 
 #### Basis by days to expiry
 
-The same chart as Finding 1 on the Overview, for the selected date range. Its takeaway adds how many expiries had a negative average basis in their last 10 days: 8 of 12 for jeera.
+The same chart as Finding 1 on the Overview, for the selected date range. Its takeaway adds how many expiries had a positive average basis (futures below spot) in their last 10 days: 8 of 12 for jeera.
 
 #### Per-contract convergence paths
 
 - **What it shows:** each contract's basis % over its last 60 days as a thin line, with the average in bold.
 - **Inputs:** `basis_pct` and `days_to_expiry` per contract, on days with open interest.
 - **How calculated:** the bold line is the mean across contracts by days to expiry, smoothed over 5 days.
-- **What you can infer:** paths differ by a few percent, but most drift down towards and through spot.
+- **What you can infer:** paths differ by a few percent, but most drift up through zero: futures start above spot (negative basis) and end below it (positive basis).
 - **Caveats:** 13 contracts; the average hides the spread.
 - **Likely question:** "How reliable is the decay?" It is the common pattern, not a certainty. Individual expiries have stayed above spot to the end.
 
@@ -392,7 +393,7 @@ The same chart as Finding 1 on the Overview, for the selected date range. Its ta
 - **What it shows:** next-month minus near-month futures on each of the last five trading days before expiry, averaged across expiries.
 - **Inputs:** settlement prices of the near and next contracts.
 - **How calculated:** next - near, grouped by trading days left.
-- **What you can infer:** jeera's next month traded Rs 406 per quintal above the expiring one on average. A long pays this to roll; a stock holder earns it by selling the next month.
+- **What you can infer:** jeera's next month traded Rs 406 per quintal above the expiring one on average (this is a spread between two futures, not the basis). A long pays this to roll; a stock holder earns it by selling the next month.
 - **Caveats:** 11 expiries; daily closes.
 - **Likely question:** "What does rolling cost?" About Rs 406 per quintal in jeera and Rs 88 in guar seed.
 
@@ -447,7 +448,7 @@ Contract JEERAUNJHA19DEC2025, 21 days to expiry. Spot 21,127.90. Futures 22,205.
 
 | Line | How | Amount |
 |---|---|---|
-| Gross basis | 22,205.00 - 21,127.90 | +1,077.10 |
+| Futures premium (basis is -1,077.10) | 22,205.00 - 21,127.90 | +1,077.10 |
 | Storage | 0.70 x 21 days, plus 18% GST | -17.35 |
 | Assaying | 50, plus 18% GST | -59.00 |
 | Handling | 10, once | -10.00 |
@@ -471,7 +472,7 @@ Contract JEERAUNJHA19JUN2026, 15 days to expiry. Spot 19,515.65. Futures 18,905.
 
 | Line | How | Amount |
 |---|---|---|
-| Price gap | 19,515.65 - 18,905.00 | +610.65 |
+| Basis (spot - futures) | 19,515.65 - 18,905.00 | +610.65 |
 | Avoided funding | 19,515.65 x 6.48% x 15 / 365 | +51.97 |
 | Avoided storage | 0.70 x 15 days, plus 18% GST | +12.39 |
 | Exchange fee | 18,905 x 5.8 / 1,00,000 | -1.10 |

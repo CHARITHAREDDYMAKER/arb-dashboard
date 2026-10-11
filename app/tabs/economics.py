@@ -27,11 +27,11 @@ def return_figure(economics: pd.DataFrame, column: str, signal: str, colour: str
 
 
 def waterfall_figure(view: View) -> go.Figure:
-    """The latest day's cash-and-carry per quintal: gross basis, each cost, and what is left."""
+    """The latest day's cash-and-carry per quintal: the futures premium, each cost, and what is left."""
     latest, costs = view.latest, view.costs
     gst_multiplier = costs.warehouse_gst_multiplier
     steps = {
-        "Gross": latest["cc_gross"],
+        "Premium": latest["cc_gross"],
         "Funding": -latest["cc_funding"],
         "Storage": -latest["cc_storage"] / gst_multiplier,
         "Assay": -latest["cc_assaying"] / gst_multiplier,
@@ -138,8 +138,8 @@ def render(view: View) -> None:
     with left:
         components.chart(
             waterfall_figure(view),
-            f"Where does the basis go on the latest day? {DAGGER}",
-            f"On {as_of}: of {rs(latest['cc_gross'], signed=True)} gross basis per quintal, costs take {rs(costs_total)}; the largest is {biggest[0]} at {rs(biggest[1])} before GST. "
+            f"Where does the futures premium go on the latest day? {DAGGER}",
+            f"On {as_of}: of {rs(latest['cc_gross'], signed=True)} futures premium per quintal (futures minus spot, the basis with its sign flipped), costs take {rs(costs_total)}; the largest is {biggest[0]} at {rs(biggest[1])} before GST. "
             f"Net {rs(latest['cc_net_profit'], signed=True)} per quintal, or {rs(latest['cc_net_profit'] * lot_quintals, 0, signed=True)} per "
             f"{view.details['lot_size_mt']} MT lot, held {latest['days_to_expiry']} days to delivery.",
             key="waterfall",
@@ -165,7 +165,7 @@ def render(view: View) -> None:
     st.markdown(
         f'<p class="takeaway">Dropping the 18% GST lifts tradeable cash-and-carry days from {pct(with_gst)} to {pct(without_gst)} of the year, '
         f"a change of {without_gst - with_gst:+.2f} points. The unverified GST treatment barely moves the conclusion; "
-        "the basis and the one-off costs matter far more.</p>",
+        "the futures premium and the one-off costs matter far more.</p>",
         unsafe_allow_html=True,
     )
 

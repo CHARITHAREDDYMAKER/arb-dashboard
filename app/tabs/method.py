@@ -10,7 +10,7 @@ from loader import View
 TRADE_STEPS = [
     ("1. Buy spot", "at the mandi, at today's spot price"),
     ("2. Assay and store", "in an NCCL-accredited warehouse"),
-    ("3. Sell futures", "the same day, locking in the basis"),
+    ("3. Sell futures", "the same day, locking in the futures premium"),
     ("4. Deliver at expiry", "and receive the futures price"),
 ]
 TRADE_DIAGRAM = '<div class="flow">' + '<div class="flow-arrow">→</div>'.join(
@@ -67,7 +67,7 @@ def render(view: View) -> None:
     st.markdown(TRADE_DIAGRAM, unsafe_allow_html=True)
     st.markdown(
         "- **Cash-and-carry.** Buy the commodity today, store it in an exchange-accredited warehouse, sell futures against it, deliver at expiry.\n"
-        "- **What it earns.** The basis (futures minus spot), locked in on day one, less funding, storage, assaying, handling and fees.\n"
+        "- **What it earns.** The futures premium (futures minus spot), locked in on day one, less funding, storage, assaying, handling and fees.\n"
         "- **When it pays.** When that return beats the cost of money. The benchmark here is the 91-day T-bill.\n"
         "- **Reverse arb.** When futures are below fair value, a stock holder sells spot and buys futures. It needs existing stock, so the gap can persist."
     )
@@ -100,6 +100,8 @@ def render(view: View) -> None:
 
     st.markdown("#### Definitions")
     st.markdown(
+        "- **Basis:** spot minus futures. Negative when futures are above spot (the cash-and-carry side), positive when futures are below spot (the reverse-arb side). "
+        "The futures premium, futures minus spot, is the same number with its sign flipped.\n"
         "- **Active contract:** the near month, until it has fewer than the roll threshold of days left; then the next month.\n"
         "- **Net carry return:** annualised return on the cash invested, after physical and transaction costs but before funding. Compare it with the T-bill.\n"
         "- **Net profit:** the same trade after funding at T-bill plus the spread.\n"

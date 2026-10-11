@@ -1,4 +1,4 @@
-"""Tab 1: spot against futures, the basis between them, and how the basis is distributed."""
+"""Tab 1: spot against futures, the basis (spot - futures) between them, and how the basis is distributed."""
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -17,7 +17,7 @@ def price_and_basis_figure(view: View, show_next: bool, show_far: bool) -> go.Fi
 
     figure = make_subplots(
         rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.04, row_heights=[0.56, 0.22, 0.22],
-        subplot_titles=("Price (Rs per quintal)", "Basis (Rs per quintal)", "Basis (% of spot)"),
+        subplot_titles=("Price (Rs per quintal)", "Basis = spot - futures (Rs per quintal)", "Basis (% of spot)"),
     )  # fmt: skip
     figure.add_scatter(x=economics["date"], y=economics["spot"], name="Spot", line=dict(color=theme.SPOT, width=2), row=1, col=1)
     figure.add_scatter(
@@ -58,7 +58,7 @@ def distribution_figure(view: View) -> go.Figure:
     figure = go.Figure(go.Histogram(x=economics["basis_pct"], nbinsx=40, marker_color=theme.FUTURES, marker_line=dict(color=theme.SURFACE, width=1), name="Days"))
     figure.add_vline(x=current, line_width=2, line_color=theme.SPOT, annotation_text=f"latest {pct(current, signed=True)}", annotation_position="top")
     figure.add_vline(x=0, line_width=1, line_color=theme.FAINT)
-    figure.update_layout(xaxis_title="Basis, % of spot", yaxis_title="Trading days", hovermode="closest", bargap=0.02)
+    figure.update_layout(xaxis_title="Basis (spot - futures), % of spot", yaxis_title="Trading days", hovermode="closest", bargap=0.02)
     return figure
 
 
@@ -69,7 +69,7 @@ def render(view: View) -> None:
     basis_pct = economics["basis_pct"]
     current, average = view.latest["basis_pct"], basis_pct.mean()
     as_of = long_date(view.latest["date"])
-    above_spot = (economics["basis"] > 0).mean() * 100
+    above_spot = (economics["basis"] < 0).mean() * 100  # negative basis = futures above spot
 
     left, right, _ = st.columns([1, 1, 4])
     show_next = left.checkbox("Show next month", key="show_next")
@@ -77,7 +77,7 @@ def render(view: View) -> None:
     components.chart(
         price_and_basis_figure(view, show_next, show_far),
         "How far do futures trade from spot, and when?",
-        f"Futures closed above spot on {above_spot:.0f}% of days. The basis ranged from {pct(basis_pct.min(), signed=True)} to "
+        f"Basis is spot minus futures, so it is negative when futures are above spot. Futures closed above spot on {above_spot:.0f}% of days. The basis ranged from {pct(basis_pct.min(), signed=True)} to "
         f"{pct(basis_pct.max(), signed=True)}; on {as_of} it was {pct(current, signed=True)}, against an average of {pct(average, signed=True)} for the period shown. "
         "Dotted lines mark expiries; diamonds mark the roll to the next contract.",
         key="price_basis", height=620,
@@ -88,15 +88,16 @@ def render(view: View) -> None:
         distribution_figure(view),
         "Is the latest basis unusual?",
         f"The basis on {as_of}, {pct(current, signed=True)}, is higher than on {percentile:.0f}% of days in the period shown. "
-        f"Half of all days fell between {pct(basis_pct.quantile(0.25), signed=True)} and {pct(basis_pct.quantile(0.75), signed=True)}.",
+        f"Half of all days fell between {pct(basis_pct.quantile(0.25), signed=True)} and {pct(basis_pct.quantile(0.75), signed=True)}. "
+        "Left of zero, futures are above spot (cash-and-carry side); right of zero, below (reverse-arb side).",
         key="basis_distribution", height=300,
     )  # fmt: skip
 
     components.kpi_row(
         [
             dict(label="Average basis", value=pct(average, signed=True), sub=rs(economics["basis"].mean(), signed=True)),
-            dict(label="Lowest", value=pct(basis_pct.min(), signed=True), sub=rs(economics["basis"].min(), signed=True)),
-            dict(label="Highest", value=pct(basis_pct.max(), signed=True), sub=rs(economics["basis"].max(), signed=True)),
+            dict(label="Lowest (futures furthest above spot)", value=pct(basis_pct.min(), signed=True), sub=rs(economics["basis"].min(), signed=True)),
+            dict(label="Highest (futures furthest below spot)", value=pct(basis_pct.max(), signed=True), sub=rs(economics["basis"].max(), signed=True)),
             dict(label="Latest vs average", value=f"{current - average:+.2f} pts", sub=f"{as_of}: {pct(current, signed=True)}"),
             dict(label="Days futures above spot", value=pct(above_spot), sub=f"{len(economics)} trading days"),
         ]

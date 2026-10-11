@@ -194,6 +194,25 @@ def test_exactly_one_active_contract_per_commodity_per_day():
     assert (marked.groupby(["date", "commodity"])["is_active"].sum() == 1).all()
 
 
+# ---- basis convention -------------------------------------------------------- #
+
+
+def test_basis_is_spot_minus_futures():
+    day = pd.Timestamp("2026-01-05")
+    futures = make_futures("2026-01-05", [30, 60]).assign(settlement_price=[20_400.0, 19_800.0], spot=20_000.0, open_interest=[100, 100])
+    spot = pd.DataFrame({"date": [day], "commodity": ["JEERA"], "spot": [20_000.0]})
+    table = metrics.basis_table(futures, spot, metrics.Rules()).set_index("contract_symbol")
+    # Futures above spot: negative basis. Futures below spot: positive basis.
+    assert table.loc["C1", "basis"] == pytest.approx(-400.0)
+    assert table.loc["C1", "basis_pct"] == pytest.approx(-2.0)
+    assert table.loc["C2", "basis"] == pytest.approx(200.0)
+    assert table.loc["C2", "basis_pct"] == pytest.approx(1.0)
+    # The futures premium (used for the curve and for cash-and-carry) is the basis with its sign flipped.
+    assert table.loc["C1", "futures_premium_pct"] == pytest.approx(2.0)
+    assert metrics.cash_and_carry(20_000.0, 20_400.0, 30, TBILL, COSTS)["cc_gross"] == pytest.approx(-table.loc["C1", "basis"])
+    assert metrics.reverse_arb(20_000.0, 19_800.0, 60, TBILL, COSTS)["rev_price_gap"] == pytest.approx(table.loc["C2", "basis"])
+
+
 # ---- three-day average spot ----------------------------------------------- #
 
 
@@ -259,7 +278,7 @@ def test_calculator_carry_lines_match_the_cost_model_exactly():
     calc = metrics.trade_calculator(SPOT, FUTURES, DAYS, TBILL, COSTS)
     model = metrics.cash_and_carry(SPOT, FUTURES, DAYS, TBILL, COSTS)
     lines = amounts(calc["carry"])
-    assert lines["Gross basis"] == model["cc_gross"]
+    assert lines["Futures premium"] == model["cc_gross"]
     assert lines["Storage"] == -model["cc_storage"]
     assert lines["Assaying"] == -model["cc_assaying"]
     assert lines["Handling"] == -model["cc_handling"]
@@ -285,7 +304,7 @@ def test_calculator_reverse_lines_match_and_add_up():
     calc = metrics.trade_calculator(SPOT, futures, DAYS, TBILL, COSTS)
     model = metrics.reverse_arb(SPOT, futures, DAYS, TBILL, COSTS)
     lines = amounts(calc["reverse"])
-    assert lines["Price gap"] == model["rev_price_gap"]
+    assert lines["Basis"] == model["rev_price_gap"]
     assert lines["Avoided funding"] + lines["Avoided storage"] == pytest.approx(model["rev_avoided_carry"])
     assert lines["Stamp duty"] == pytest.approx(-0.396)  # 19,800 x 0.002%, charged because futures are bought
     assert lines["= Net benefit"] == model["rev_benefit"]

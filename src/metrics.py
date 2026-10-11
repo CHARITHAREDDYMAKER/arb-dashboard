@@ -8,6 +8,10 @@ Conventions
   * All money amounts are Rs per quintal (the unit futures and spot are quoted in).
   * Percentages are in percent (5.5 means 5.5%), annualised on a 365-day year.
   * Only `settlement_price` is used; OHLC is 0 on days a contract did not trade.
+  * Basis = spot - futures (the textbook convention). Negative basis means futures
+    are above spot (the cash-and-carry side); positive means futures are below spot
+    (the reverse-arb side). The cash-and-carry gross gain, futures - spot, is called
+    the futures premium and is simply the basis with its sign flipped.
   * Most functions take ONE commodity's rows, because cost inputs differ by commodity.
 """
 
@@ -270,15 +274,18 @@ def classify_tradeable(signal, cash_and_carry_profit, reverse_benefit):
 def basis_table(futures: pd.DataFrame, spot: pd.DataFrame, rules: Rules) -> pd.DataFrame:
     """Basis of every contract on every day, with the active contract marked.
 
-    basis = settlement - spot. `basis_vs_3d_avg` uses the 3-day average spot,
-    the level the contract actually settles to at expiry.
+    basis = spot - settlement price. Negative = futures above spot.
+    `basis_vs_3d_avg_pct` uses the 3-day average spot, the level the contract
+    actually settles to at expiry.
     """
     table = mark_active_contract(futures, rules.roll_dte_threshold)
     table = table.merge(add_three_day_spot(spot)[["date", "commodity", "spot_3d_avg"]], on=["date", "commodity"], how="left")
-    table["basis"] = table["settlement_price"] - table["spot"]
+    table["basis"] = table["spot"] - table["settlement_price"]
     table["basis_pct"] = table["basis"] / table["spot"] * 100
     table["basis_ann_pct"] = annualise(table["basis_pct"], table["days_to_expiry"])
-    table["basis_vs_3d_avg_pct"] = (table["settlement_price"] / table["spot_3d_avg"] - 1) * 100
+    table["basis_vs_3d_avg_pct"] = (1 - table["settlement_price"] / table["spot_3d_avg"]) * 100
+    # Futures relative to spot, for the term-structure curve ("% above spot"): the basis % with its sign flipped.
+    table["futures_premium_pct"] = (table["settlement_price"] / table["spot"] - 1) * 100
     table["term"] = np.select([table["contract_rank"] == 1, table["contract_rank"] == 2], ["near", "next"], default="far")
     return table
 
@@ -315,7 +322,10 @@ def expiry_settlements(basis: pd.DataFrame) -> pd.DataFrame:
     """
     last_date = basis["date"].max()
     final = basis.loc[(basis["date"] == basis["expiry"]) & (basis["expiry"] <= last_date)]
-    final = final.assign(convergence_error_pct=final["basis_vs_3d_avg_pct"], same_day_gap_pct=final["basis_pct"])
+    final = final.assign(
+        convergence_error_pct=(final["settlement_price"] / final["spot_3d_avg"] - 1) * 100,
+        same_day_gap_pct=(final["settlement_price"] / final["spot"] - 1) * 100,
+    )
     columns = ["commodity", "contract_symbol", "expiry", "settlement_price", "spot", "spot_3d_avg", "same_day_gap_pct", "convergence_error_pct"]
     return final[columns].rename(columns={"settlement_price": "final_settlement"}).sort_values(["commodity", "expiry"])
 
@@ -370,8 +380,9 @@ def convergence_paths(basis: pd.DataFrame, rules: Rules) -> pd.DataFrame:
 def convergence_buckets(paths: pd.DataFrame) -> pd.DataFrame:
     """Average basis % by days-to-expiry bucket, across contracts.
 
-    The mean shows direction (do futures approach spot from above or below);
-    the mean absolute value shows how tight the basis is, whatever its sign.
+    The mean shows direction: negative while futures sit above spot, positive
+    once they fall below it. The mean absolute value shows how tight the basis
+    is, whatever its sign.
     """
     buckets = (
         paths.groupby(["commodity", "dte_bucket"])
@@ -446,9 +457,9 @@ def term_structure(basis: pd.DataFrame, rules: Rules) -> pd.DataFrame:
     curve["curve_position"] = curve.groupby(["date", "commodity"])["expiry"].rank(method="first").astype(int)
     columns = [
         "date", "commodity", "contract_symbol", "expiry", "days_to_expiry", "curve_position", "term",
-        "settlement_price", "spot", "basis_pct", "open_interest",
+        "settlement_price", "spot", "futures_premium_pct", "open_interest",
     ]  # fmt: skip
-    return curve[columns].rename(columns={"basis_pct": "pct_vs_spot"})
+    return curve[columns].rename(columns={"futures_premium_pct": "pct_vs_spot"})
 
 
 def term_structure_daily(curve: pd.DataFrame) -> pd.DataFrame:
@@ -584,7 +595,7 @@ def trade_calculator(spot, futures_price, days, tbill_pct, costs: CostInputs) ->
     storage = storage_cost(days, costs)
 
     carry_lines = [
-        ("Gross basis", "futures - spot", carry["cc_gross"]),
+        ("Futures premium", "futures - spot (= minus the basis)", carry["cc_gross"]),
         ("Storage", f"Rs {costs.storage_rs_per_quintal_per_day:.2f} x {days} days{gst_note}", -carry["cc_storage"]),
         ("Assaying", f"Rs {costs.assaying_rs_per_quintal:.0f} per quintal, once{gst_note}", -carry["cc_assaying"]),
         ("Handling", f"Rs {costs.handling_rs_per_quintal:.0f} per quintal, once", -carry["cc_handling"]),
@@ -598,7 +609,7 @@ def trade_calculator(spot, futures_price, days, tbill_pct, costs: CostInputs) ->
         ("= Net profit after funding", "carry profit - funding", carry["cc_net_profit"]),
     ]
     reverse_lines = [
-        ("Price gap", "spot - futures", reverse["rev_price_gap"]),
+        ("Basis", "spot - futures", reverse["rev_price_gap"]),
         ("Avoided funding", f"spot x {funding_rate:.2f}% x {days}/365", funding),
         ("Avoided storage", f"Rs {costs.storage_rs_per_quintal_per_day:.2f} x {days} days{gst_note}", storage),
         ("Exchange fee", f"futures x Rs {costs.exchange_fee_rs_per_lakh} per lakh", -buy_leg["exchange_fee"]),

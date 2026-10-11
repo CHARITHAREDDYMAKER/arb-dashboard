@@ -42,7 +42,7 @@ def key_numbers(commodity: str, tables: dict[str, pd.DataFrame]) -> pd.DataFrame
         ("Spot (Rs/quintal)", f"{snap['spot']:,.2f}"),
         ("Active contract", f"{snap['active_contract']}, {snap['days_to_expiry']} days to expiry"),
         ("Active futures", f"{snap['active_futures']:,.2f}"),
-        ("Basis", f"{snap['basis']:+,.2f} ({snap['basis_pct']:+.2f}%)"),
+        ("Basis (spot - futures)", f"{snap['basis']:+,.2f} ({snap['basis_pct']:+.2f}%)"),
         (f"Fair value {ASSUMED}", f"{snap['fair_value']:,.2f}; futures {snap['mispricing_pct']:+.2f}% vs fair"),
         (f"Raw signal (vs fair value) {ASSUMED}", snap["signal"]),
         (f"Tradeable signal (profitable after all costs) {ASSUMED}", snap["tradeable_signal"]),
@@ -152,7 +152,8 @@ def findings(tables: dict[str, pd.DataFrame]) -> list[str]:
         "",
         f"The futures curve was in contango on {contango['JEERA']:.1f}% of days for jeera and {contango['GUARSEED']:.1f}% for guar seed, "
         f"sloping up about {slope['JEERA']:.1f}% and {slope['GUARSEED']:.1f}% a month (roughly {slope['JEERA'] * 12:.0f}% and {slope['GUARSEED'] * 12:.0f}% a year), "
-        "well above the cost of money plus warehouse rent. Yet the contract nearest to expiry trades at or below spot: "
+        "well above the cost of money plus warehouse rent. Yet the contract nearest to expiry trades at or below spot. "
+        "With basis defined as spot minus futures (negative = futures above spot), the "
         f"average basis 6 to 10 days before expiry is {buckets.loc[('JEERA', '6-10'), 'mean_basis_pct']:+.2f}% for jeera and "
         f"{buckets.loc[('GUARSEED', '6-10'), 'mean_basis_pct']:+.2f}% for guar seed, against "
         f"{buckets.loc[('JEERA', '46-60'), 'mean_basis_pct']:+.2f}% and {buckets.loc[('GUARSEED', '46-60'), 'mean_basis_pct']:+.2f}% at 46 to 60 days. "
@@ -229,7 +230,8 @@ def write_report(tables: dict[str, pd.DataFrame], tbill: pd.DataFrame) -> Path:
     lines += [
         "## Basis by days to expiry",
         "",
-        "Average basis % across contracts, on days with open interest. The sign flips from positive to negative as expiry nears.",
+        "Average basis % (spot minus futures) across contracts, on days with open interest. It is negative while futures sit above spot "
+        "and turns positive as expiry nears and futures fall below spot.",
         "",
         to_markdown(buckets[["commodity", "dte_bucket", "observations", "contracts", "mean_basis_pct", "mean_abs_basis_pct"]]),
         "",

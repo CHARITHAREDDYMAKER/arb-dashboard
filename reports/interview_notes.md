@@ -8,7 +8,7 @@ quoting today's numbers. Figures marked † depend on the handling or GST assump
 ## Numbers to remember
 
 1. **1.4% a month:** the average upward slope of both futures curves, roughly 17% a year, against a T-bill near 5.3%.
-2. **+2.0% to -0.5%:** jeera's average basis at 46 to 60 days out, and at 6 to 10 days out. The premium is gone before expiry.
+2. **-2.0% to +0.5%:** jeera's average basis (spot minus futures) at 46 to 60 days out, and at 6 to 10 days out. Futures go from 2% above spot to below it; the premium is gone before expiry.
 3. **64%:** share of days guar seed was a tradeable reverse arb †. Cash-and-carry was tradeable on only 14% †.
 4. **0.07%:** average gap between final settlement and the 3-day average spot, across 23 expired contracts.
 5. **Rs 2.9 crore and Rs 10.7 crore:** median daily capacity in jeera and guar seed at 10% of volume.
@@ -41,7 +41,7 @@ Tab order in the app: Overview, Signal Finder, Cash vs Futures, Arb Economics, T
 
 **1:40 Cash vs Futures (25 seconds)**
 - Question: "How far do futures usually sit from spot?"
-- Finding: "Jeera futures closed above spot on 61% of days. The basis ranged from -3.7% to +6.9% and averaged +0.45%. Today's is ordinary."
+- Finding: "I define basis as spot minus futures, so it is negative when futures are above spot. Jeera futures closed above spot on 61% of days. The basis ranged from -6.9% to +3.7% and averaged -0.45%. Today's, -0.83%, is ordinary."
 
 **2:05 Convergence & Entry Timing (40 seconds)**
 - Question: "Does a contract keep its premium as delivery approaches?"
@@ -92,10 +92,13 @@ Because it is the best of 106 tradeable days, and annualising stretches it. On 2
 Annualising a short trade exaggerates it. Guar seed's best reverse day by rupees was 13 Jan 2026: Rs 233 a quintal with 7 days left, which annualises to 212%. A small gain multiplied by 52 is not a return anyone can compound. Short trades are also the ones where the one-off assaying and handling costs hurt most and where liquidity has already moved to the next contract. They are shown in a separate table, labelled as exaggerated, and the header leads with rupees for them.
 
 **How does the reverse-arb comparison with the T-bill work?**
-Reverse-arb benefit has three parts: the price gap, the storage saved, and the interest saved on the cash from selling the stock. That interest is itself earned at about the T-bill rate (T-bill plus the spread). Comparing the full return with the T-bill would count it twice. So the dashboard compares the return excluding avoided funding. On 4 Jun 2026 jeera reverse arb earned 83.68% annualised in full; excluding the Rs 52 of interest saved it was 77.20%, which is 71.72 points over a 5.48% T-bill. Across all tradeable reverse days the median is about 26% in full and 19% excluding avoided funding. This mirrors cash-and-carry, whose return is quoted before funding for the same reason.
+Reverse-arb benefit has three parts: the basis (spot minus futures), the storage saved, and the interest saved on the cash from selling the stock. That interest is itself earned at about the T-bill rate (T-bill plus the spread). Comparing the full return with the T-bill would count it twice. So the dashboard compares the return excluding avoided funding. On 4 Jun 2026 jeera reverse arb earned 83.68% annualised in full; excluding the Rs 52 of interest saved it was 77.20%, which is 71.72 points over a 5.48% T-bill. Across all tradeable reverse days the median is about 26% in full and 19% excluding avoided funding. This mirrors cash-and-carry, whose return is quoted before funding for the same reason.
 
 **What does the arrival season have to do with the best dates?**
 The dashboard counts how many of the top dates fell in each crop's typical arrival season. Those months are general market knowledge, not exchange data, and the count is an observation, not a cause. One year is one crop cycle.
+
+**How do you define basis?**
+Spot minus futures, the textbook convention. A negative basis means futures are above spot, which is the cash-and-carry side; a positive basis means futures are below spot, the reverse-arb side. Some desks quote it the other way round (futures minus spot), so I say the definition before quoting a number. In the dashboard the futures-minus-spot figure is called the futures premium; it is the same number with its sign flipped.
 
 **Why did you not use same-day spot for convergence?**
 Because it understates how well contracts converge. Against same-day spot the average gap is 0.61%; against the 3-day average it is 0.07%.

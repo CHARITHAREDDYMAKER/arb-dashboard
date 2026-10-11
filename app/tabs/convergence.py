@@ -23,7 +23,7 @@ def bucket_figure(buckets) -> go.Figure:
         )  # fmt: skip
     )
     figure.add_hline(y=0, line_width=1.5, line_color=theme.SPOT)
-    figure.update_layout(xaxis_title="Days to expiry", yaxis=dict(title="Average basis, % of spot (0 = spot)", ticksuffix="%"), hovermode="closest")
+    figure.update_layout(xaxis_title="Days to expiry", yaxis=dict(title="Average basis (spot - futures), % of spot", ticksuffix="%"), hovermode="closest")
     return figure
 
 
@@ -38,7 +38,7 @@ def paths_figure(paths) -> go.Figure:
     average = paths.groupby("days_to_expiry")["basis_pct"].mean().rolling(5, center=True, min_periods=1).mean()
     figure.add_scatter(x=average.index, y=average.values, name="Average across contracts (5-day smoothed)", line=dict(color=theme.FUTURES, width=3))
     figure.add_hline(y=0, line_width=1.5, line_color=theme.SPOT)
-    figure.update_layout(yaxis=dict(title="Basis, % of spot", ticksuffix="%"), hovermode="closest")
+    figure.update_layout(yaxis=dict(title="Basis (spot - futures), % of spot", ticksuffix="%"), hovermode="closest")
     figure.update_xaxes(autorange="reversed", title="Days to expiry")
     return figure
 
@@ -79,14 +79,14 @@ def render(view: View) -> None:
         return
     by_bucket = buckets.set_index("dte_bucket")["mean_basis_pct"]
 
-    # On how many expiries did the basis average below zero in the last 10 days?
+    # On how many expiries did the basis average above zero (futures below spot) in the last 10 days?
     final_days = paths.loc[paths["days_to_expiry"] <= 10].groupby("contract_symbol")["basis_pct"].mean()
     far, near = by_bucket.get("46-60"), by_bucket.get("6-10")
     components.chart(
         bucket_figure(buckets),
         "Does a contract keep its premium as delivery approaches?",
-        f"No. Futures averaged {pct(far, signed=True)} over spot at 46 to 60 days and {pct(near, signed=True)} at 6 to 10 days. "
-        f"The basis averaged below zero inside the last 10 days on {(final_days < 0).sum()} of {len(final_days)} expiries. "
+        f"No. Basis is spot minus futures: it averaged {pct(far, signed=True)} at 46 to 60 days (futures above spot) and {pct(near, signed=True)} at 6 to 10 days (futures below spot). "
+        f"It averaged above zero inside the last 10 days on {(final_days > 0).sum()} of {len(final_days)} expiries. "
         "The carry is earned early in a contract's life, not in its final weeks.",
         key="bucket_basis",
     )
@@ -97,7 +97,7 @@ def render(view: View) -> None:
             paths_figure(paths),
             "How consistent is that path from one expiry to the next?",
             f"Each grey line is one of {paths['contract_symbol'].nunique()} contracts on days it had open interest; the blue line is their average. "
-            "Individual paths scatter by a few percent, but the drift down towards and through spot is common to most.",
+            "Individual paths scatter by a few percent, but the drift up through zero, as futures fall from above spot to below it, is common to most.",
             key="paths",
         )
     with right:

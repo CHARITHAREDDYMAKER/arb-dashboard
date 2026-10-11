@@ -13,7 +13,7 @@ CHART_HEIGHT = 250
 
 TAB_GUIDE = [
     ("Signal Finder", "both trades worked through for any date, and the best dates of the year for each side."),
-    ("Cash vs Futures", "how far futures sit from spot each day, and whether today is unusual."),
+    ("Cash vs Futures", "the basis (spot minus futures) each day, and whether today is unusual."),
     ("Arb Economics", "what each side earns after costs, where the costs go, and every tradeable day."),
     ("Term Structure", "the shape of the futures curve and how steeply it pays to carry stock."),
     ("Convergence & Entry Timing", "how the basis decays into expiry and when a trade should be entered."),
@@ -63,10 +63,10 @@ def limit_figure(peers) -> go.Figure:
 
 def compact(figure: go.Figure) -> go.Figure:
     """Tighten a full-size chart so it reads inside a card."""
-    figure.update_traces(textfont=dict(size=11, color=theme.INK), cliponaxis=False, texttemplate='%{y:+.1f}%')
+    figure.update_traces(textfont=dict(size=11, color=theme.INK), cliponaxis=False, texttemplate="%{y:+.1f}%")
     figure.update_layout(uniformtext=dict(minsize=11, mode="show"), bargap=0.15)  # stop Plotly shrinking the labels to fit
     figure.update_xaxes(tickangle=0, tickfont=dict(size=10))
-    figure.update_yaxes(title="Basis, % of spot")
+    figure.update_yaxes(title="Basis (spot - futures), %")
     return figure
 
 
@@ -96,8 +96,8 @@ def render(view: View) -> None:
     with first:
         finding(
             1, "The carry is earned early, not near expiry",
-            f"{view.name} futures averaged {pct(by_bucket.get('46-60'), signed=True)} over spot 46 to 60 days out and "
-            f"{pct(by_bucket.get('6-10'), signed=True)} at 6 to 10 days, while the curve sloped up {pct(slope)} a month.",
+            f"{view.name} basis (spot minus futures) averaged {pct(by_bucket.get('46-60'), signed=True)} at 46 to 60 days, futures above spot, and "
+            f"{pct(by_bucket.get('6-10'), signed=True)} at 6 to 10 days, futures below spot. The curve sloped up {pct(slope)} a month.",
             compact(bucket_figure(buckets)), "overview_buckets",
         )  # fmt: skip
     with second:
